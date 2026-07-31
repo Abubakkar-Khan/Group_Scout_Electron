@@ -17,6 +17,8 @@ type SettingsForm = {
   activeFrom: string
   activeTo: string
   monitoringMode: string
+  maxPostAgeHours: string
+  autoDeleteViewedDays: string
   groqApiKey: string
   useGroq: boolean
   groqSystemPrompt: string
@@ -30,6 +32,8 @@ export default function SettingsPage() {
     activeFrom: "08:00",
     activeTo: "20:00",
     monitoringMode: "default",
+    maxPostAgeHours: "48",
+    autoDeleteViewedDays: "30",
     groqApiKey: "",
     useGroq: false,
     groqSystemPrompt: ""
@@ -50,6 +54,8 @@ export default function SettingsPage() {
             activeFrom: data.activeFrom || "08:00",
             activeTo: data.activeTo || "20:00",
             monitoringMode: data.monitoringMode || "default",
+            maxPostAgeHours: data.maxPostAgeHours?.toString() || "48",
+            autoDeleteViewedDays: data.autoDeleteViewedDays?.toString() || "30",
             groqApiKey: data.groqApiKey ? "********" : "", // Mask the actual key
             useGroq: data.useGroq ?? false,
             groqSystemPrompt: data.groqSystemPrompt || ""
@@ -80,6 +86,8 @@ export default function SettingsPage() {
           activeFrom: settings.activeFrom,
           activeTo: settings.activeTo,
           monitoringMode: settings.monitoringMode,
+          maxPostAgeHours: parseInt(settings.maxPostAgeHours, 10),
+          autoDeleteViewedDays: parseInt(settings.autoDeleteViewedDays, 10),
           groqApiKey,
           useGroq: settings.useGroq,
           groqSystemPrompt: settings.groqSystemPrompt
@@ -173,7 +181,41 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Outside these hours, the worker will pause automatically to conserve resources.</p>
+
+            <div className="grid gap-4 md:grid-cols-2 pt-2 border-t border-border/40">
+              <div className="space-y-2 text-start">
+                <Label>Max Post Age Filter (Hours)</Label>
+                {loading ? <Skeleton className="h-10 w-full" /> : (
+                  <Input 
+                    type="number" 
+                    min="1"
+                    max="720"
+                    placeholder="48"
+                    value={settings.maxPostAgeHours} 
+                    onChange={(e) => setSettings({ ...settings, maxPostAgeHours: e.target.value })}
+                    className="bg-background/50" 
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">Ignore posts published older than this many hours ago (default: 48h).</p>
+              </div>
+
+              <div className="space-y-2 text-start">
+                <Label>Auto-Delete Viewed Posts (Days)</Label>
+                {loading ? <Skeleton className="h-10 w-full" /> : (
+                  <Input 
+                    type="number" 
+                    min="1"
+                    max="365"
+                    placeholder="30"
+                    value={settings.autoDeleteViewedDays} 
+                    onChange={(e) => setSettings({ ...settings, autoDeleteViewedDays: e.target.value })}
+                    className="bg-background/50" 
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">Automatically prune viewed leads older than this many days (default: 30 days).</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">Outside active hours, the worker will pause automatically to conserve resources.</p>
           </CardContent>
         </Card>
 

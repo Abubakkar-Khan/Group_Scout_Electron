@@ -47,9 +47,23 @@ function keywordTokens(keyword: string): string[] {
 
 export function findBestKeywordMatch(
   content: string,
-  keywords: KeywordLike[]
+  keywords: KeywordLike[],
+  negativeKeywords: KeywordLike[] = []
 ): KeywordMatch | null {
   const normalizedContent = ` ${normalizeLeadText(content)} `;
+
+  // 1. Exclude if post matches any negative keyword
+  for (const item of negativeKeywords) {
+    const negKeyword = item.keyword.trim();
+    if (!negKeyword) continue;
+
+    const normalizedNeg = normalizeLeadText(negKeyword);
+    if (normalizedContent.includes(` ${normalizedNeg} `)) {
+      return null; // Excluded by negative keyword match
+    }
+  }
+
+  // 2. Match target positive keywords
   let best: KeywordMatch | null = null;
 
   for (const item of keywords) {

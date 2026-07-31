@@ -10,21 +10,22 @@ generator client {
 // --- Auth Models ---
 
 model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
+  id               String            @id
+  name             String
+  email            String
+  emailVerified    Boolean           @default(false)
+  image            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  sessions         Session[]
+  accounts         Account[]
   
-  keywords      Keyword[]
-  groups        MonitoredGroup[]
-  posts         Post[]
-  logEvents     LogEvent[]
-  settings      Settings?
+  keywords         Keyword[]
+  negativeKeywords NegativeKeyword[]
+  groups           MonitoredGroup[]
+  posts            Post[]
+  logEvents        LogEvent[]
+  settings         Settings?
 
   @@unique([email])
   @@map("user")
@@ -88,6 +89,17 @@ model Keyword {
   @@unique([userId, keyword])
 }
 
+model NegativeKeyword {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keyword   String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, keyword])
+}
+
 model MonitoredGroup {
   id              String   @id @default(cuid())
   facebookGroupId String
@@ -132,15 +144,17 @@ model Post {
 }
 
 model Settings {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scanInterval     Int      @default(5)
-  activeFrom       String   @default("08:00")
-  activeTo         String   @default("20:00")
-  monitoringMode   String   @default("default")
-  autoScrollPages  Int      @default(5)
-  groqApiKey       String?  // Encrypted API key
-  useGroq          Boolean  @default(false)
-  groqSystemPrompt String   @default("You are a lead classifier. Determine if this Facebook post is genuinely looking for the service related to the provided keywords. Respond ONLY with valid JSON: {\"relevant\": true/false}")
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scanInterval         Int      @default(5)
+  activeFrom           String   @default("08:00")
+  activeTo             String   @default("20:00")
+  monitoringMode       String   @default("default")
+  autoScrollPages      Int      @default(5)
+  maxPostAgeHours      Int      @default(48)
+  autoDeleteViewedDays Int      @default(30)
+  groqApiKey           String?  // Encrypted API key
+  useGroq              Boolean  @default(false)
+  groqSystemPrompt     String   @default("You are a lead classifier. Determine if this Facebook post is genuinely looking for the service related to the provided keywords. Respond ONLY with valid JSON: {\"relevant\": true/false}")
 }

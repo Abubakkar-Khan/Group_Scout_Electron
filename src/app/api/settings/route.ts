@@ -27,6 +27,8 @@ export async function GET() {
       activeFrom: settings.activeFrom,
       activeTo: settings.activeTo,
       monitoringMode: settings.monitoringMode,
+      maxPostAgeHours: settings.maxPostAgeHours ?? 48,
+      autoDeleteViewedDays: settings.autoDeleteViewedDays ?? 30,
       groqApiKey: !!settings.groqApiKey, // Only return a boolean indicating if it's set
       useGroq: settings.useGroq,
       groqSystemPrompt: settings.groqSystemPrompt,
@@ -42,7 +44,7 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json()
-    const { scanInterval, autoScrollPages, activeFrom, activeTo, monitoringMode, groqApiKey, useGroq, groqSystemPrompt } = body
+    const { scanInterval, autoScrollPages, activeFrom, activeTo, monitoringMode, maxPostAgeHours, autoDeleteViewedDays, groqApiKey, useGroq, groqSystemPrompt } = body
 
     const settingsData = {
       scanInterval: isNaN(scanInterval) || scanInterval === null ? 5 : scanInterval,
@@ -50,9 +52,11 @@ export async function PATCH(request: Request) {
       activeFrom: activeFrom || "08:00",
       activeTo: activeTo || "20:00",
       monitoringMode: monitoringMode || "default",
+      maxPostAgeHours: isNaN(maxPostAgeHours) || maxPostAgeHours === null ? 48 : maxPostAgeHours,
+      autoDeleteViewedDays: isNaN(autoDeleteViewedDays) || autoDeleteViewedDays === null ? 30 : autoDeleteViewedDays,
     } satisfies Pick<
       Prisma.SettingsUncheckedCreateInput,
-      "scanInterval" | "autoScrollPages" | "activeFrom" | "activeTo" | "monitoringMode"
+      "scanInterval" | "autoScrollPages" | "activeFrom" | "activeTo" | "monitoringMode" | "maxPostAgeHours" | "autoDeleteViewedDays"
     >
 
     const updateData: Prisma.SettingsUncheckedUpdateInput = { ...settingsData }
@@ -88,6 +92,8 @@ export async function PATCH(request: Request) {
       activeFrom: settings.activeFrom,
       activeTo: settings.activeTo,
       monitoringMode: settings.monitoringMode,
+      maxPostAgeHours: settings.maxPostAgeHours,
+      autoDeleteViewedDays: settings.autoDeleteViewedDays,
       groqApiKey: !!settings.groqApiKey,
       useGroq: settings.useGroq,
       groqSystemPrompt: settings.groqSystemPrompt,

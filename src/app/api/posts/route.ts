@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
 import type { Prisma } from "@prisma/client"
-
 import { prisma } from "@/lib/db"
 
 export async function GET(request: Request) {
@@ -14,6 +13,9 @@ export async function GET(request: Request) {
   const relevantParam = searchParams.get("relevant")
   const viewedParam = searchParams.get("viewed")
   const searchParam = searchParams.get("search")
+  const keywordParam = searchParams.get("keyword")
+  const groupIdParam = searchParams.get("groupId")
+  const timeRangeParam = searchParams.get("timeRange")
   
   const whereClause: Prisma.PostWhereInput = { userId: session.user.id }
   if (relevantParam === "true") whereClause.relevant = true
@@ -21,6 +23,29 @@ export async function GET(request: Request) {
   if (viewedParam === "true") whereClause.viewed = true
   if (viewedParam === "false") whereClause.viewed = false
   
+  if (keywordParam && keywordParam !== "ALL") whereClause.keyword = keywordParam
+  if (groupIdParam && groupIdParam !== "ALL") whereClause.groupId = groupIdParam
+
+  if (timeRangeParam && timeRangeParam !== "ALL") {
+    let startDate: Date | null = null
+
+    if (timeRangeParam === "today") {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      startDate = today
+    } else if (timeRangeParam === "24h") {
+      startDate = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    } else if (timeRangeParam === "7d") {
+      startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    } else if (timeRangeParam === "30d") {
+      startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    }
+
+    if (startDate) {
+      whereClause.createdAt = { gte: startDate }
+    }
+  }
+
   if (searchParam) {
     whereClause.OR = [
       { content: { contains: searchParam } },

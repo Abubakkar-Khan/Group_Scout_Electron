@@ -6,11 +6,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { ExternalLink, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react"
+import { ExternalLink, Search, Filter, ChevronLeft, ChevronRight, Download, Calendar, Tag, Users } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from "sonner"
 
 interface Lead {
   id: string
@@ -23,6 +24,11 @@ interface Lead {
   relevant: boolean
   createdAt: string
   group: { name: string, iconUrl?: string | null }
+}
+
+interface FilterOption {
+  id: string
+  name: string
 }
 
 const getCompactTime = (date: string) => {
@@ -46,8 +52,37 @@ export default function LeadsPage() {
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("ALL") // ALL, NEW, VIEWED
-  
+  const [selectedKeyword, setSelectedKeyword] = useState("ALL")
+  const [selectedGroup, setSelectedGroup] = useState("ALL")
+  const [timeRange, setTimeRange] = useState("ALL") // ALL, today, 24h, 7d, 30d
+
+  const [availableKeywords, setAvailableKeywords] = useState<FilterOption[]>([])
+  const [availableGroups, setAvailableGroups] = useState<FilterOption[]>([])
+
   const limit = 20
+
+  useEffect(() => {
+    // Fetch filter options (keywords and groups)
+    const fetchOptions = async () => {
+      try {
+        const [kwRes, grpRes] = await Promise.all([
+          fetch("/api/keywords"),
+          fetch("/api/groups")
+        ])
+        if (kwRes.ok) {
+          const kws = await kwRes.json()
+          setAvailableKeywords(kws.map((k: any) => ({ id: k.keyword, name: k.keyword })))
+        }
+        if (grpRes.ok) {
+          const grps = await grpRes.json()
+          setAvailableGroups(grps.map((g: any) => ({ id: g.id, name: g.name || g.facebookGroupId })))
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    fetchOptions()
+  }, [])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,6 +93,9 @@ export default function LeadsPage() {
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
         if (filter === "NEW") url += `&viewed=false`
         if (filter === "VIEWED") url += `&viewed=true`
+        if (selectedKeyword !== "ALL") url += `&keyword=${encodeURIComponent(selectedKeyword)}`
+        if (selectedGroup !== "ALL") url += `&groupId=${encodeURIComponent(selectedGroup)}`
+        if (timeRange !== "ALL") url += `&timeRange=${encodeURIComponent(timeRange)}`
 
         const res = await fetch(url)
         if (res.ok) {
@@ -72,25 +110,62 @@ export default function LeadsPage() {
       }
     }
     
-    // Add a small debounce for search
     const timeout = setTimeout(fetchData, 300)
     return () => clearTimeout(timeout)
-  }, [page, searchQuery, filter])
+  }, [page, searchQuery, filter, selectedKeyword, selectedGroup, timeRange])
+
+  const exportCSV = () => {
+    if (leads.length === 0) {
+      toast.error("No leads available to export")
+      return
+    }
+
+    const headers = ["Group", "Keyword", "Content", "URL", "Status", "Date"]
+    const rows = leads.map(l => [
+      `"${(l.group?.name || '').replace(/"/g, '""')}"`,
+      `"${l.keyword.replace(/"/g, '""')}"`,
+      `"${l.content.replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+      `"${l.url}"`,
+      l.viewed ? "Viewed" : "New",
+      `"${new Date(l.createdAt).toLocaleString()}"`
+    ])
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n")
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `groupscout_leads_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success("Leads exported to CSV")
+  }
 
   const totalPages = Math.ceil(totalCount / limit) || 1
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 pb-4">
-        <h1 className="text-3xl font-bold tracking-tight">All Leads</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">All Leads</h1>
+            <p className="text-muted-foreground text-sm mt-1">Filter, review, and export captured lead opportunities.</p>
+          </div>
+
+          <Button onClick={exportCSV} variant="outline" className="gap-2 shrink-0 border-primary/50 text-primary hover:bg-primary/10">
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+        </div>
         
-        <div className="flex flex-row gap-3 w-full">
-          <div className="relative flex-1">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        {/* Filters Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 w-full">
+          {/* Search bar */}
+          <div className="relative sm:col-span-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input 
               type="text" 
-              placeholder="       Search leads..." 
-              className="h-10 w-full rounded-lg border border-input bg-card pl-20 pr-4 text-sm shadow-sm transition-all focus:ring-2 focus:ring-primary outline-none placeholder:text-muted-foreground"
+              placeholder="Search leads content..." 
+              className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-4 text-sm shadow-sm transition-all focus:ring-2 focus:ring-primary outline-none placeholder:text-muted-foreground"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
@@ -99,24 +174,75 @@ export default function LeadsPage() {
             />
           </div>
           
-          <div className="w-[140px] md:w-[180px] shrink-0">
+          {/* Keyword filter */}
+          <div>
             <Select
-              value={filter}
-              onValueChange={(value) => {
-                if (value) setFilter(value)
+              value={selectedKeyword}
+              onValueChange={(val) => {
+                setSelectedKeyword(val)
                 setPage(1)
               }}
             >
               <SelectTrigger className="h-10 bg-card border-input font-medium shadow-sm w-full">
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <SelectValue placeholder="Filter Status" />
+                <div className="flex items-center gap-2 overflow-hidden truncate">
+                  <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Keyword" />
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All Leads</SelectItem>
-                <SelectItem value="NEW">New Leads</SelectItem>
-                <SelectItem value="VIEWED">Viewed Leads</SelectItem>
+                <SelectItem value="ALL">All Keywords</SelectItem>
+                {availableKeywords.map(kw => (
+                  <SelectItem key={kw.id} value={kw.id}>{kw.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Group filter */}
+          <div>
+            <Select
+              value={selectedGroup}
+              onValueChange={(val) => {
+                setSelectedGroup(val)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="h-10 bg-card border-input font-medium shadow-sm w-full">
+                <div className="flex items-center gap-2 overflow-hidden truncate">
+                  <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Group" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Groups</SelectItem>
+                {availableGroups.map(grp => (
+                  <SelectItem key={grp.id} value={grp.id}>{grp.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Time range filter */}
+          <div>
+            <Select
+              value={timeRange}
+              onValueChange={(val) => {
+                setTimeRange(val)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="h-10 bg-card border-input font-medium shadow-sm w-full">
+                <div className="flex items-center gap-2 overflow-hidden truncate">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Time Range" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="24h">Last 24 Hours</SelectItem>
+                <SelectItem value="7d">Last 7 Days</SelectItem>
+                <SelectItem value="30d">Last 30 Days</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -152,7 +278,7 @@ export default function LeadsPage() {
                 ) : leads.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                      No leads match your criteria.
+                      No leads match your filter criteria.
                     </TableCell>
                   </TableRow>
                 ) : (

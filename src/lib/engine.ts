@@ -35,15 +35,27 @@ async function processPostsInBackground(
   posts: FacebookPost[],
   user: Pick<User, "id">,
   keywords: Pick<Keyword, "keyword">[],
+  negativeKeywords: Pick<Keyword, "keyword">[],
   settings: Settings,
   groups: Pick<MonitoredGroup, "id" | "facebookGroupId">[]
 ): Promise<{ matchCount: number; savedCount: number }> {
   let matchCount = 0;
   let savedCount = 0;
 
+  const maxAgeHours = settings.maxPostAgeHours || 48;
+  const cutoffTime = Date.now() - maxAgeHours * 60 * 60 * 1000;
+
   for (const post of posts) {
     const trimmedContent = post.content.trim();
     if (!trimmedContent) continue;
+
+    // Filter out posts older than maxPostAgeHours
+    if (post.timestamp) {
+      const postTime = new Date(post.timestamp).getTime();
+      if (!isNaN(postTime) && postTime < cutoffTime) {
+        continue;
+      }
+    }
 
     // Skip duplicates
     const existing = await prisma.post.findFirst({
@@ -51,8 +63,8 @@ async function processPostsInBackground(
     });
     if (existing) continue;
 
-    // Keyword matching
-    const matched = findBestKeywordMatch(trimmedContent, keywords);
+    // Keyword matching with negative keyword exclusion
+    const matched = findBestKeywordMatch(trimmedContent, keywords, negativeKeywords);
     if (!matched) continue;
 
     matchCount++;
@@ -67,7 +79,7 @@ async function processPostsInBackground(
         await engineDelay(500, 1500);
       } catch (error: any) {
         console.error(`[Engine] Groq error:`, error);
-        isRelevant = true; // If Groq fails, save as relevant anyway
+        isRelevant = true;
       }
     } else {
       isRelevant = true; // No Groq = all keyword matches are leads
@@ -109,11 +121,12 @@ async function runScan() {
   isRunning = true;
 
   try {
-    // 1. Fetch user data
+    // 1. Fetch user data with negative keywords
     const user = await prisma.user.findFirst({
       include: {
         settings: true,
         keywords: { where: { enabled: true } },
+        negativeKeywords: { where: { enabled: true } },
         groups: { where: { enabled: true } },
       },
     });
@@ -123,7 +136,25 @@ async function runScan() {
       return;
     }
 
-    const { settings, keywords, groups } = user;
+    const { settings, keywords, negativeKeywords, groups } = user;
+
+    // Auto-cleanup viewed posts older than autoDeleteViewedDays
+    const retentionDays = settings.autoDeleteViewedDays || 30;
+    const deleteCutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    try {
+      const deleted = await prisma.post.deleteMany({
+        where: {
+          userId: user.id,
+          viewed: true,
+          createdAt: { lt: deleteCutoff }
+        }
+      });
+      if (deleted.count > 0) {
+        await logEngineEvent(user.id, "INFO", `Auto-cleaned ${deleted.count} viewed lead(s) older than ${retentionDays} days.`);
+      }
+    } catch (cleanErr) {
+      console.error("[Engine] Auto-cleanup error:", cleanErr);
+    }
 
     if (groups.length === 0) {
       await logEngineEvent(user.id, "WARN", "No enabled groups to scan. Add Facebook Groups in dashboard.");
@@ -211,7 +242,7 @@ async function runScan() {
       }
 
       if (posts.length > 0) {
-        const result = await processPostsInBackground(posts, user, keywords, settings, groups);
+        const result = await processPostsInBackground(posts, user, keywords, negativeKeywords, settings, groups);
         totalPostsSaved += result.savedCount;
       }
 
