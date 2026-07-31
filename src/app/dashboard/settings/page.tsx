@@ -326,43 +326,70 @@ export default function SettingsPage() {
               <Clock className="size-5 text-muted-foreground" />
               <CardTitle className="text-lg">Operating Schedule & Active Hours</CardTitle>
             </div>
-            <CardDescription className="text-xs text-muted-foreground">Set the designated local time window when GroupScout is allowed to scan.</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">Type custom start and end times in 24-hour format (e.g. 08:30 to 20:15) or click a quick preset.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-1">
             <div className="grid gap-5 md:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground">Active Start Time (From)</Label>
+                <Label className="text-xs font-semibold text-foreground">Active Start Time (HH:MM)</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
-                  <Select value={settings.activeFrom} onValueChange={(v) => v && setSettings({ ...settings, activeFrom: v })}>
-                    <SelectTrigger className="bg-card/60 border-border text-sm h-10 focus:ring-1 focus:ring-emerald-500">
-                      <SelectValue placeholder="Start time" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl max-h-56">
-                      {HOURS_OPTIONS.map((h) => (
-                        <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    type="text"
+                    placeholder="00:00"
+                    value={settings.activeFrom}
+                    onChange={(e) => setSettings({ ...settings, activeFrom: e.target.value })}
+                    className="bg-card/60 border-border text-foreground font-mono text-sm h-10 px-3.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
                 )}
+                <p className="text-[11px] text-muted-foreground">Type start time in 24h format (e.g. 08:00 or 00:00).</p>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground">Active End Time (To)</Label>
+                <Label className="text-xs font-semibold text-foreground">Active End Time (HH:MM)</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
-                  <Select value={settings.activeTo} onValueChange={(v) => v && setSettings({ ...settings, activeTo: v })}>
-                    <SelectTrigger className="bg-card/60 border-border text-sm h-10 focus:ring-1 focus:ring-emerald-500">
-                      <SelectValue placeholder="End time" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl max-h-56">
-                      {HOURS_OPTIONS.map((h) => (
-                        <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    type="text"
+                    placeholder="23:59"
+                    value={settings.activeTo}
+                    onChange={(e) => setSettings({ ...settings, activeTo: e.target.value })}
+                    className="bg-card/60 border-border text-foreground font-mono text-sm h-10 px-3.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
                 )}
+                <p className="text-[11px] text-muted-foreground">Type end time in 24h format (e.g. 20:00 or 23:59).</p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Outside active hours, the scanner automatically pauses to preserve system resources.</p>
+
+            {/* Quick Presets */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/40">
+              <span className="text-xs text-muted-foreground font-medium">Quick Presets:</span>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSettings({ ...settings, activeFrom: "00:00", activeTo: "23:59" })}
+                className="h-7 text-[11px] border-border bg-background/50 hover:bg-muted text-foreground"
+              >
+                24 Hours (00:00 - 23:59)
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSettings({ ...settings, activeFrom: "09:00", activeTo: "18:00" })}
+                className="h-7 text-[11px] border-border bg-background/50 hover:bg-muted text-foreground"
+              >
+                Day Time (09:00 - 18:00)
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSettings({ ...settings, activeFrom: "20:00", activeTo: "06:00" })}
+                className="h-7 text-[11px] border-border bg-background/50 hover:bg-muted text-foreground"
+              >
+                Night Shift (20:00 - 06:00)
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
