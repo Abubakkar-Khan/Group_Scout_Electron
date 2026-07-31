@@ -6,9 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { Save, Gauge, Clock, ShieldCheck, Trash2, Zap, Sliders, Lock } from "lucide-react"
+import { Save, Gauge, Clock, ShieldCheck, Trash2, Cpu, Lock, Key } from "lucide-react"
 
 type SettingsForm = {
   userId: string
@@ -70,7 +71,7 @@ export default function SettingsPage() {
             autoDeleteViewedDays: data.autoDeleteViewedDays?.toString() || "30",
             groqApiKey: data.groqApiKey ? "********" : "",
             useGroq: data.useGroq ?? false,
-            groqSystemPrompt: data.groqSystemPrompt || ""
+            groqSystemPrompt: data.groqSystemPrompt || "You are a lead classifier. Determine if this Facebook post is genuinely looking for the service related to the provided keywords. Respond ONLY with valid JSON: {\"relevant\": true/false}"
           })
         }
       } catch (e) {
@@ -146,7 +147,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Customize background scraper speed, operating schedule, and data retention.</p>
+        <p className="text-muted-foreground mt-1 text-sm">Customize background scraper speed, operating schedule, AI options, and data retention.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6 max-w-4xl">
@@ -156,17 +157,17 @@ export default function SettingsPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2 text-emerald-400">
               <ShieldCheck className="size-5" />
-              <CardTitle className="text-lg">Facebook Authentication & Browser Session</CardTitle>
+              <CardTitle className="text-lg">Facebook Authentication & Session</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              GroupScout runs in invisible headless Chromium. If Facebook asks for login, verify your session here.
+              No manual session IDs or cookies required. Playwright stores your session automatically in <code className="font-mono text-emerald-400">chrome-data</code>.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-2">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-background/50 border border-border/60">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">Session Status</p>
-                <p className="text-xs text-muted-foreground">Session cookies saved in local <code className="font-mono text-emerald-400">chrome-data</code> profile.</p>
+                <p className="text-sm font-medium text-foreground">Automatic Session Storage</p>
+                <p className="text-xs text-muted-foreground">Click below to open a browser window and log into Facebook once. Future background scans use this session automatically.</p>
               </div>
               <Button 
                 type="button" 
@@ -314,7 +315,62 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Data Retention & Post Age Filters */}
+        {/* Optional Groq AI Classification Card */}
+        <Card className="bg-card/50 backdrop-blur-md border border-border/60 shadow-xl">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <Cpu className="size-5" />
+                <CardTitle className="text-lg">Groq AI Filtering (Optional)</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="use-groq" className="text-xs text-muted-foreground cursor-pointer">
+                  {settings.useGroq ? "AI Filtering ON" : "AI Filtering OFF (Default)"}
+                </Label>
+                <Switch
+                  id="use-groq"
+                  checked={settings.useGroq}
+                  onCheckedChange={(checked) => setSettings({ ...settings, useGroq: checked })}
+                />
+              </div>
+            </div>
+            <CardDescription className="text-xs">
+              By default, AI filtering is OFF so keyword matches instantly become leads. Enable if you want Groq AI to re-verify post intent.
+            </CardDescription>
+          </CardHeader>
+          {settings.useGroq && (
+            <CardContent className="space-y-4 pt-2 border-t border-border/40">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Key className="size-3.5 text-emerald-400" /> Groq API Key
+                </Label>
+                {loading ? <Skeleton className="h-10 w-full" /> : (
+                  <Input 
+                    type="password"
+                    placeholder="gsk_..." 
+                    value={settings.groqApiKey} 
+                    onChange={(e) => setSettings({ ...settings, groqApiKey: e.target.value })}
+                    className="bg-background/50 border-border text-sm h-10 font-mono" 
+                  />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-foreground">Custom AI System Prompt</Label>
+                {loading ? <Skeleton className="h-20 w-full" /> : (
+                  <textarea 
+                    rows={3}
+                    value={settings.groqSystemPrompt} 
+                    onChange={(e) => setSettings({ ...settings, groqSystemPrompt: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background/50 p-3 text-xs text-foreground outline-none focus:border-emerald-500 font-mono leading-relaxed" 
+                  />
+                )}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Data Retention & Post Age Limits */}
         <Card className="bg-card/50 backdrop-blur-md border border-border/60 shadow-xl">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2 text-emerald-400">
