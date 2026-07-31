@@ -29,6 +29,15 @@ export async function POST(request: Request) {
       const { openLoginWindow } = await import("@/lib/engine");
       await openLoginWindow();
       return NextResponse.json({ success: true, status: "login_opened" });
+    } else if (action === "check_session") {
+      const fs = await import("fs");
+      const path = await import("path");
+      const userDataDir = path.join(process.cwd(), "chrome-data");
+      const sessionExists = fs.existsSync(userDataDir) && fs.readdirSync(userDataDir).length > 2;
+      return NextResponse.json({ 
+        sessionExists, 
+        status: sessionExists ? "authenticated" : "unauthenticated" 
+      });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

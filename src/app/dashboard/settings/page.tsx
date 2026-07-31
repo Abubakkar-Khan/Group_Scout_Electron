@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Save, Gauge, Clock, ShieldCheck, Trash2, Cpu, Lock, Key } from "lucide-react"
+import { Save, Gauge, Clock, ShieldCheck, Trash2, Cpu, Lock, CheckCircle2, AlertCircle } from "lucide-react"
 
 type SettingsForm = {
   userId: string
@@ -48,9 +49,27 @@ export default function SettingsPage() {
     useGroq: false,
     groqSystemPrompt: ""
   })
+
+  const [sessionAuthenticated, setSessionAuthenticated] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [loginLaunching, setLoginLaunching] = useState(false)
+
+  const checkSessionStatus = async () => {
+    try {
+      const res = await fetch("/api/engine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "check_session" })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSessionAuthenticated(data.sessionExists ?? false)
+      }
+    } catch {
+      setSessionAuthenticated(false)
+    }
+  }
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -80,7 +99,9 @@ export default function SettingsPage() {
         setLoading(false)
       }
     }
+    
     fetchSettings()
+    checkSessionStatus()
   }, [])
 
   const handleSave = async (e: React.FormEvent) => {
@@ -133,6 +154,8 @@ export default function SettingsPage() {
       })
       if (res.ok) {
         toast.success("Opening Facebook Login Window... Log in if prompted, then close when done.")
+        // Check session again after a delay
+        setTimeout(checkSessionStatus, 8000)
       } else {
         toast.error("Failed to launch login window")
       }
@@ -147,51 +170,79 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Customize background scraper speed, operating schedule, AI options, and data retention.</p>
+        <p className="text-muted-foreground mt-1 text-sm">Configure background scanning behavior, operating hours, and data retention.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6 max-w-4xl">
 
-        {/* Facebook Authentication Card */}
-        <Card className="bg-card/50 backdrop-blur-md border border-emerald-500/20 shadow-xl">
+        {/* Facebook Session Status Card */}
+        <Card className="bg-card/40 backdrop-blur-md border border-border shadow-md">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <ShieldCheck className="size-5" />
-              <CardTitle className="text-lg">Facebook Authentication & Session</CardTitle>
+            <div className="flex items-center gap-2 text-foreground">
+              <ShieldCheck className="size-5 text-muted-foreground" />
+              <CardTitle className="text-lg">Facebook Session & Authentication</CardTitle>
             </div>
-            <CardDescription className="text-xs">
-              No manual session IDs or cookies required. Playwright stores your session automatically in <code className="font-mono text-emerald-400">chrome-data</code>.
+            <CardDescription className="text-xs text-muted-foreground">
+              Playwright maintains your Facebook session profile inside local <code className="font-mono text-foreground">chrome-data</code>.
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-2">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-background/50 border border-border/60">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">Automatic Session Storage</p>
-                <p className="text-xs text-muted-foreground">Click below to open a browser window and log into Facebook once. Future background scans use this session automatically.</p>
+          <CardContent className="pt-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-background/40 border border-border">
+              <div className="flex items-start gap-3">
+                {sessionAuthenticated === null ? (
+                  <Skeleton className="size-5 rounded-full mt-0.5" />
+                ) : sessionAuthenticated ? (
+                  <CheckCircle2 className="size-5 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="size-5 text-amber-400 shrink-0 mt-0.5" />
+                )}
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-foreground">Session Status:</span>
+                    {sessionAuthenticated === null ? (
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                    ) : sessionAuthenticated ? (
+                      <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-medium px-2 py-0.5">
+                        Authenticated & Ready
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[11px] font-medium px-2 py-0.5">
+                        Verification Required
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {sessionAuthenticated 
+                      ? "Your Facebook login profile is active. Background group scans run automatically." 
+                      : "Log into Facebook once in Chrome to allow GroupScout to scan public feeds continuously."}
+                  </p>
+                </div>
               </div>
+
               <Button 
                 type="button" 
                 variant="outline" 
                 onClick={handleOpenLogin} 
                 disabled={loginLaunching}
-                className="shrink-0 gap-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-medium"
+                className="shrink-0 gap-2 border-border text-foreground hover:bg-muted text-xs font-medium h-9"
               >
-                <Lock className="size-4" /> {loginLaunching ? "Opening..." : "Log In / Verify Facebook Session"}
+                <Lock className="size-3.5" /> 
+                {loginLaunching ? "Opening Window..." : sessionAuthenticated ? "Re-verify / Switch Account" : "Log In to Facebook"}
               </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Scraper Speed & Performance Controls */}
-        <Card className="bg-card/50 backdrop-blur-md border border-border/60 shadow-xl">
+        <Card className="bg-card/40 backdrop-blur-md border border-border shadow-md">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <Gauge className="size-5" />
+            <div className="flex items-center gap-2 text-foreground">
+              <Gauge className="size-5 text-muted-foreground" />
               <CardTitle className="text-lg">Scraper Speed & Performance</CardTitle>
             </div>
-            <CardDescription className="text-xs">Configure how fast the Chromium engine scrolls and pauses between Facebook groups.</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">Configure scroll speed, pauses between groups, and background cycle frequency.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5 pt-2">
+          <CardContent className="space-y-5 pt-1">
             <div className="grid gap-5 md:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-foreground">Scrolling Speed</Label>
@@ -201,7 +252,7 @@ export default function SettingsPage() {
                       <SelectValue placeholder="Select speed" />
                     </SelectTrigger>
                     <SelectContent className="bg-card/95 border-border">
-                      <SelectItem value="fast">⚡ Fast (Quick scrolls, 150ms pauses)</SelectItem>
+                      <SelectItem value="fast">⚡ Fast (Quick scrolls, 150ms delays)</SelectItem>
                       <SelectItem value="medium">⚡ Medium (Balanced - Recommended)</SelectItem>
                       <SelectItem value="slow">🐢 Stealth / Slow (Human reading pace)</SelectItem>
                       <SelectItem value="human">👤 Human Mimic (Variable micro-pauses)</SelectItem>
@@ -212,7 +263,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground">Pause Between Groups (Seconds)</Label>
+                <Label className="text-xs font-semibold text-foreground">Pause Between Groups</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Select value={settings.interGroupDelaySeconds} onValueChange={(v) => v && setSettings({ ...settings, interGroupDelaySeconds: v })}>
                     <SelectTrigger className="bg-background/50 border-border text-sm h-10">
@@ -269,15 +320,15 @@ export default function SettingsPage() {
         </Card>
 
         {/* Operating Schedule & Active Hours */}
-        <Card className="bg-card/50 backdrop-blur-md border border-border/60 shadow-xl">
+        <Card className="bg-card/40 backdrop-blur-md border border-border shadow-md">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <Clock className="size-5" />
+            <div className="flex items-center gap-2 text-foreground">
+              <Clock className="size-5 text-muted-foreground" />
               <CardTitle className="text-lg">Operating Schedule & Active Hours</CardTitle>
             </div>
-            <CardDescription className="text-xs">Set the designated local time window when GroupScout is allowed to scan.</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">Set the designated local time window when GroupScout is allowed to scan.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5 pt-2">
+          <CardContent className="space-y-5 pt-1">
             <div className="grid gap-5 md:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-foreground">Active Start Time (From)</Label>
@@ -316,11 +367,11 @@ export default function SettingsPage() {
         </Card>
 
         {/* Optional Groq AI Classification Card */}
-        <Card className="bg-card/50 backdrop-blur-md border border-border/60 shadow-xl">
+        <Card className="bg-card/40 backdrop-blur-md border border-border shadow-md">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-400">
-                <Cpu className="size-5" />
+              <div className="flex items-center gap-2 text-foreground">
+                <Cpu className="size-5 text-muted-foreground" />
                 <CardTitle className="text-lg">Groq AI Filtering (Optional)</CardTitle>
               </div>
               <div className="flex items-center gap-2">
@@ -334,16 +385,14 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-            <CardDescription className="text-xs">
+            <CardDescription className="text-xs text-muted-foreground">
               By default, AI filtering is OFF so keyword matches instantly become leads. Enable if you want Groq AI to re-verify post intent.
             </CardDescription>
           </CardHeader>
           {settings.useGroq && (
             <CardContent className="space-y-4 pt-2 border-t border-border/40">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Key className="size-3.5 text-emerald-400" /> Groq API Key
-                </Label>
+                <Label className="text-xs font-semibold text-foreground">Groq API Key</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Input 
                     type="password"
@@ -371,15 +420,15 @@ export default function SettingsPage() {
         </Card>
 
         {/* Data Retention & Post Age Limits */}
-        <Card className="bg-card/50 backdrop-blur-md border border-border/60 shadow-xl">
+        <Card className="bg-card/40 backdrop-blur-md border border-border shadow-md">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <Trash2 className="size-5" />
+            <div className="flex items-center gap-2 text-foreground">
+              <Trash2 className="size-5 text-muted-foreground" />
               <CardTitle className="text-lg">Data Retention & Post Age Limits</CardTitle>
             </div>
-            <CardDescription className="text-xs">Prevent old posts from being saved and clean up viewed leads automatically.</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">Prevent old posts from being saved and clean up viewed leads automatically.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5 pt-2">
+          <CardContent className="space-y-5 pt-1">
             <div className="grid gap-5 md:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-foreground">Max Post Age Limit (Hours)</Label>
@@ -421,7 +470,7 @@ export default function SettingsPage() {
           <Button 
             type="submit" 
             disabled={saving || loading}
-            className="gap-2 px-6 h-11 text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-lg shadow-emerald-500/20 transition-all"
+            className="gap-2 px-6 h-11 text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-md shadow-emerald-500/20 transition-all"
           >
             <Save className="size-4" /> {saving ? "Saving Changes..." : "Save Settings"}
           </Button>
