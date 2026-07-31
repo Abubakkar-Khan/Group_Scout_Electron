@@ -179,7 +179,7 @@ export default function LeadsPage() {
             <Select
               value={selectedKeyword}
               onValueChange={(val) => {
-                setSelectedKeyword(val)
+                if (val) setSelectedKeyword(val)
                 setPage(1)
               }}
             >
@@ -203,7 +203,7 @@ export default function LeadsPage() {
             <Select
               value={selectedGroup}
               onValueChange={(val) => {
-                setSelectedGroup(val)
+                if (val) setSelectedGroup(val)
                 setPage(1)
               }}
             >
@@ -227,7 +227,7 @@ export default function LeadsPage() {
             <Select
               value={timeRange}
               onValueChange={(val) => {
-                setTimeRange(val)
+                if (val) setTimeRange(val)
                 setPage(1)
               }}
             >
