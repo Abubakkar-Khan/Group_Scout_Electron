@@ -8,6 +8,23 @@ import { findBestKeywordMatch } from "./lead-matching";
 const automator = new FacebookAutomator();
 let isRunning = false;
 
+/** Log event helper to write persistent events to the database for UI display */
+async function logEngineEvent(userId: string, type: "INFO" | "WARN" | "ERROR" | "SUCCESS", message: string, metadata?: any) {
+  console.log(`[Engine:${type}] ${message}`);
+  try {
+    await prisma.logEvent.create({
+      data: {
+        userId,
+        type,
+        message,
+        metadata: metadata ? JSON.stringify(metadata) : null,
+      }
+    });
+  } catch (err) {
+    console.error("[Engine] Failed to save log event to DB:", err);
+  }
+}
+
 /** Random delay between min and max milliseconds */
 function engineDelay(minMs: number, maxMs: number): Promise<void> {
   const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
@@ -39,7 +56,7 @@ async function processPostsInBackground(
     if (!matched) continue;
 
     matchCount++;
-    console.log(`[Engine] Keyword "${matched.keyword}" matched in post ${post.postId.substring(0, 12)}...`);
+    await logEngineEvent(user.id, "INFO", `Keyword "${matched.keyword}" matched post in group ${post.groupId}`);
 
     // Groq classification
     let isRelevant = false;
@@ -47,17 +64,14 @@ async function processPostsInBackground(
       try {
         const groq = getGroqClient(settings.groqApiKey);
         isRelevant = await classifyPost(groq, matched.keyword, trimmedContent, settings.groqSystemPrompt);
-        // Small delay between API calls to respect rate limits
         await engineDelay(500, 1500);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`[Engine] Groq error:`, error);
         isRelevant = true; // If Groq fails, save as relevant anyway
       }
     } else {
       isRelevant = true; // No Groq = all keyword matches are leads
     }
-
-    console.log(`[Engine] Post ${post.postId.substring(0, 12)}... -> ${isRelevant ? "LEAD" : "Ignored"}`);
 
     // Save to database
     const groupDb = groups.find((g) => g.facebookGroupId === post.groupId);
@@ -75,11 +89,12 @@ async function processPostsInBackground(
         },
       });
       savedCount++;
+      await logEngineEvent(user.id, "SUCCESS", `New lead saved! Keyword: "${matched.keyword}"`, { url: post.url });
     }
   }
 
   if (posts.length > 0) {
-    console.log(`[Engine] Background processing complete for ${posts[0].groupId}. ${matchCount} matched, ${savedCount} saved.`);
+    console.log(`[Engine] Processing complete for ${posts[0].groupId}. ${matchCount} matched, ${savedCount} saved.`);
   }
 
   return { matchCount, savedCount };
@@ -92,7 +107,6 @@ async function runScan() {
   }
 
   isRunning = true;
-  console.log(`\n--- [Engine] Starting scan at ${new Date().toLocaleTimeString()} ---`);
 
   try {
     // 1. Fetch user data
@@ -112,12 +126,12 @@ async function runScan() {
     const { settings, keywords, groups } = user;
 
     if (groups.length === 0) {
-      console.log("[Engine] No enabled groups. Add groups in the dashboard.");
+      await logEngineEvent(user.id, "WARN", "No enabled groups to scan. Add Facebook Groups in dashboard.");
       return;
     }
 
     if (keywords.length === 0) {
-      console.log("[Engine] No enabled keywords. Add keywords in the dashboard.");
+      await logEngineEvent(user.id, "WARN", "No enabled keywords to monitor. Add Keywords in dashboard.");
       return;
     }
 
@@ -136,16 +150,18 @@ async function runScan() {
         : currentMinutes >= startTime || currentMinutes <= endTime;
 
     if (!insideWindow) {
-      console.log(`[Engine] Outside active hours (${settings.activeFrom}-${settings.activeTo}). Sleeping.`);
+      await logEngineEvent(user.id, "INFO", `Outside designated active hours (${settings.activeFrom}-${settings.activeTo}). Standing by.`);
       await automator.close();
       return;
     }
+
+    await logEngineEvent(user.id, "INFO", `Starting background scan across ${groups.length} Facebook group(s)...`);
 
     // 3. Launch browser (reuses session if already open)
     await automator.init();
     const loggedIn = await automator.checkLogin();
     if (!loggedIn) {
-      console.log("[Engine] Facebook login is required before scanning can continue.");
+      await logEngineEvent(user.id, "WARN", "Facebook authentication required. Please click 'Log In / Verify Facebook Session' in Settings.");
       return;
     }
 
@@ -155,7 +171,8 @@ async function runScan() {
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
-      console.log(`[Engine] Scanning group ${i + 1}/${groups.length}: ${group.name || group.facebookGroupId}`);
+      const groupDisplayName = group.name || group.facebookGroupId;
+      await logEngineEvent(user.id, "INFO", `Scanning group (${i + 1}/${groups.length}): ${groupDisplayName}`);
 
       const maxPosts = Math.max(15, Math.min(75, settings.autoScrollPages * 10));
       const { posts, groupName, iconUrl } = await automator.scanGroup(
@@ -165,6 +182,8 @@ async function runScan() {
       );
       totalPostsScraped += posts.length;
 
+      await logEngineEvent(user.id, "INFO", `Extracted ${posts.length} post(s) from ${groupDisplayName}`);
+
       // Update group stats
       const updateData: any = {
         lastScan: new Date(),
@@ -173,7 +192,6 @@ async function runScan() {
       };
       
       try {
-        // Try to update with iconUrl first
         await prisma.monitoredGroup.update({
           where: { id: group.id },
           data: {
@@ -182,10 +200,7 @@ async function runScan() {
           },
         });
       } catch (prismaError: any) {
-        // If Prisma client is outdated (hasn't been regenerated) and doesn't know about iconUrl yet,
-        // fallback to updating without it to prevent the engine from crashing.
         if (prismaError.message && prismaError.message.includes('iconUrl')) {
-          console.warn(`[Engine] Skipped saving iconUrl for ${group.id} because Prisma client is outdated. Please run 'npx prisma generate' and restart your Next.js server.`);
           await prisma.monitoredGroup.update({
             where: { id: group.id },
             data: updateData,
@@ -202,16 +217,14 @@ async function runScan() {
 
       // Crisp, efficient pause between groups (1.5s–3s)
       if (i < groups.length - 1) {
-        const pauseSec = Math.floor(Math.random() * 2) + 1;
-        console.log(`[Engine] Moving to next group in ${pauseSec}s...`);
         await engineDelay(1500, 3000);
       }
     }
 
-    console.log(`--- [Engine] Scraping complete. ${totalPostsScraped} posts scraped, ${totalPostsSaved} posts saved. Chrome remains open. ---\n`);
+    await logEngineEvent(user.id, "SUCCESS", `Scan completed. ${totalPostsScraped} post(s) checked, ${totalPostsSaved} new lead(s) captured.`);
 
-  } catch (error) {
-    console.error("[Engine] Error during scan (Chrome will stay open):", error);
+  } catch (error: any) {
+    console.error("[Engine] Error during scan:", error);
   } finally {
     isRunning = false;
   }
