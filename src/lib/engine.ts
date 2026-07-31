@@ -299,6 +299,10 @@ export function stopEngine() {
   return { status: "stopped" };
 }
 
+export function openLoginWindow() {
+  return automator.openLoginWindow();
+}
+
 export function getEngineStatus() {
   return globalAny.engineInterval ? "running" : "stopped";
 }

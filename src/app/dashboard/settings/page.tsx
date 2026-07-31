@@ -177,6 +177,38 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+          <CardHeader>
+            <CardTitle>Facebook Account & Authentication</CardTitle>
+            <CardDescription>Connect or verify your Facebook login session for background group scanning.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              GroupScout needs your Facebook session to browse groups. Click below to open a browser window and log in once. Your session will be saved locally.
+            </p>
+            <div className="flex items-center gap-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="border-primary/50 text-primary hover:bg-primary/10"
+                onClick={async () => {
+                  toast.info("Opening Facebook Login Window...");
+                  try {
+                    await fetch("/api/engine", {
+                      method: "POST",
+                      body: JSON.stringify({ action: "login" })
+                    });
+                  } catch (err) {
+                    toast.error("Failed to open login window");
+                  }
+                }}
+              >
+                Log In / Verify Facebook Session
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
 
 
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">

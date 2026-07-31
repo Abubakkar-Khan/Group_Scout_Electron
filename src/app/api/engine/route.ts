@@ -25,6 +25,10 @@ export async function POST(request: Request) {
     } else if (action === "stop") {
       const result = stopEngine();
       return NextResponse.json(result);
+    } else if (action === "login") {
+      const { openLoginWindow } = await import("@/lib/engine");
+      await openLoginWindow();
+      return NextResponse.json({ success: true, status: "login_opened" });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

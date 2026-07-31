@@ -161,8 +161,9 @@ function parseGraphqlPayload(text: string): unknown[] {
 export class FacebookAutomator {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private isHeadlessMode: boolean = true;
 
-  async init() {
+  async init(overrideHeadless?: boolean) {
     // If already initialised, reuse the existing context
     if (this.context && this.page) {
       if (!this.page.isClosed()) {
@@ -175,10 +176,13 @@ export class FacebookAutomator {
       }
     }
 
-    const isHeadless = process.env.HEADLESS !== "false"; // Default true: invisible Chromium!
-    const useSystemChrome = process.env.USE_SYSTEM_CHROME === "true" && fs.existsSync(CHROME_PATH);
+    const isHeadless = overrideHeadless !== undefined ? overrideHeadless : process.env.HEADLESS !== "false";
+    this.isHeadlessMode = isHeadless;
 
-    console.log(`[FacebookAutomator] Launching Chromium (Headless: ${isHeadless})...`);
+    // Use system Chrome if installed on Windows for best compatibility and saved sessions
+    const useSystemChrome = fs.existsSync(CHROME_PATH);
+
+    console.log(`[FacebookAutomator] Launching Browser (System Chrome: ${useSystemChrome}, Headless: ${isHeadless})...`);
     
     const launchOptions: any = {
       headless: isHeadless,
@@ -204,7 +208,7 @@ export class FacebookAutomator {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     });
 
-    console.log("[FacebookAutomator] Chromium launched successfully.");
+    console.log("[FacebookAutomator] Browser launched successfully.");
   }
 
   async checkLogin(): Promise<boolean> {
@@ -216,8 +220,7 @@ export class FacebookAutomator {
         waitUntil: "domcontentloaded",
         timeout: 20000,
       });
-      // Give the SPA time to hydrate
-      await humanDelay(3000, 5000);
+      await humanDelay(2000, 3500);
     } catch {
       console.log("[FacebookAutomator] Slow network – proceeding anyway.");
     }
@@ -226,27 +229,54 @@ export class FacebookAutomator {
     const isLoginPage = await this.page.evaluate(() => {
       return (
         document.querySelector('input[name="email"]') !== null ||
-        document.location.pathname.includes("/login")
+        document.location.pathname.includes("/login") ||
+        document.location.href.includes("facebook.com/login")
       );
     });
 
     if (isLoginPage) {
-      console.log("[FacebookAutomator] ❌ Not logged in. Please log in manually in the Chrome window.");
-      console.log("[FacebookAutomator] ⏳ Waiting up to 120 seconds for you to log in...");
+      console.log("[FacebookAutomator] ❌ Facebook Login required!");
+      
+      // If headless, re-launch in headed (visible) mode so user can log in
+      if (this.isHeadlessMode) {
+        console.log("[FacebookAutomator] 🔑 Opening visible Chrome window for manual Facebook login...");
+        await this.close();
+        await this.init(false); // Force headed (visible) mode
+        if (!this.page) return false;
+        await this.page.goto("https://www.facebook.com/login", { waitUntil: "domcontentloaded" });
+      }
 
-      // Wait for navigation away from login page (user logs in manually)
+      console.log("[FacebookAutomator] ⏳ Waiting up to 120s for Facebook login completion...");
+
       try {
         await this.page.waitForURL((url) => !url.toString().includes("/login"), {
           timeout: 120000,
         });
         await humanDelay(3000, 5000);
-        console.log("[FacebookAutomator] ✅ Login detected! Continuing...");
+        console.log("[FacebookAutomator] ✅ Facebook Login detected!");
+        
+        // Switch back to headless mode for silent background operation
+        await this.close();
+        await this.init(true);
         return true;
       } catch {
-        console.log("[FacebookAutomator] ❌ Login timeout. Please try again.");
+        console.log("[FacebookAutomator] ❌ Login timeout or window closed.");
         return false;
       }
     }
+
+    console.log("[FacebookAutomator] ✅ Logged into Facebook. Current URL:", currentUrl);
+    return true;
+  }
+
+  async openLoginWindow(): Promise<boolean> {
+    console.log("[FacebookAutomator] Manually opening Facebook login window...");
+    await this.close();
+    await this.init(false); // Open visible window
+    if (!this.page) return false;
+    await this.page.goto("https://www.facebook.com/login", { waitUntil: "domcontentloaded" });
+    return true;
+  }
 
     console.log("[FacebookAutomator] ✅ Already logged in. Current URL:", currentUrl);
     return true;
