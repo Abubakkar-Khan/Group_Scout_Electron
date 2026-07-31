@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
     const dateFilter = startDate ? { createdAt: { gte: startDate } } : {}
 
-    const [keywordMatches, leads, totalLeads, latestSync, totalScrapedAgg, periodPostsCount] = await Promise.all([
+    const [keywordMatches, leads, totalLeads, latestSync, totalScrapedAgg, periodPostsCount, scanLogs] = await Promise.all([
       // Posts matching keywords in selected period
       prisma.post.count({
         where: {
@@ -62,22 +62,44 @@ export async function GET(request: Request) {
         where: { userId: session.user.id },
         _sum: { postsScanned: true }
       }),
-      // Posts created in period (for Period Scanned estimate)
+      // Posts created in period
       prisma.post.count({
         where: {
           userId: session.user.id,
           ...dateFilter,
         }
+      }),
+      // SCAN_STATS logs within period
+      prisma.logEvent.findMany({
+        where: {
+          userId: session.user.id,
+          type: "SCAN_STATS",
+          ...dateFilter,
+        },
+        select: { metadata: true }
       })
     ])
 
     const isConnected = latestSync && (new Date().getTime() - new Date(latestSync.createdAt).getTime()) < 60000;
     const extensionState = latestSync && latestSync.metadata ? JSON.parse(latestSync.metadata) : null;
 
-    // For daily/weekly/monthly periods, estimate total scraped or use period count
-    const totalScraped = period === "all" 
-      ? (totalScrapedAgg._sum.postsScanned || 0)
-      : Math.max(periodPostsCount, Math.round((totalScrapedAgg._sum.postsScanned || 0) * (period === "daily" ? 0.2 : period === "weekly" ? 0.6 : 0.9)))
+    // Compute real dynamic total posts scanned for period
+    let totalScraped = totalScrapedAgg._sum.postsScanned || 0;
+    if (period !== "all") {
+      let periodSum = 0;
+      for (const log of scanLogs) {
+        if (log.metadata) {
+          try {
+            const meta = JSON.parse(log.metadata);
+            if (typeof meta.postsScanned === "number") {
+              periodSum += meta.postsScanned;
+            }
+          } catch {}
+        }
+      }
+      // If scan logs exist for period, use exact sum; otherwise fallback to posts count or all-time total
+      totalScraped = periodSum > 0 ? periodSum : Math.max(periodPostsCount, Math.min(periodPostsCount, totalScraped));
+    }
 
     return NextResponse.json({
       status: getEngineStatus() === "running" ? "Active" : "Offline",

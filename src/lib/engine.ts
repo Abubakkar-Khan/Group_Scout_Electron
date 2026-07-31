@@ -226,7 +226,7 @@ async function runScan() {
       );
       totalPostsScraped += posts.length;
 
-      await logEngineEvent(user.id, "INFO", `Extracted ${posts.length} post(s) from ${groupDisplayName}`);
+      await logEngineEvent(user.id, "SCAN_STATS", `Extracted ${posts.length} post(s) from ${groupDisplayName}`, JSON.stringify({ postsScanned: posts.length, groupId: group.id }));
 
       // Update group stats
       const updateData: any = {
