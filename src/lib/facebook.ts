@@ -515,8 +515,6 @@ export class FacebookAutomator {
 
             // ── URL & Timestamp extraction ──
             let url = "";
-            const timestamp = new Date().toISOString();
-
             const allLinks = Array.from(el.querySelectorAll("a[href]"));
 
             // Look for permalink-style links
@@ -533,6 +531,39 @@ export class FacebookAutomator {
               const rawHref = postLink.getAttribute("href") || "";
               url = absoluteFacebookUrl(rawHref);
             }
+
+            let rawTimeText = "";
+            if (postLink) {
+              rawTimeText = (postLink as HTMLElement).innerText?.trim() || "";
+            }
+            if (!rawTimeText || rawTimeText.length > 30) {
+              const timeEl = el.querySelector("abbr, time, a[href*='/posts/'] span, a[href*='/permalink/'] span");
+              if (timeEl) rawTimeText = (timeEl as HTMLElement).innerText?.trim() || "";
+            }
+
+            const parseRelativeTimestamp = (raw: string): string => {
+              if (!raw) return new Date().toISOString();
+              const lower = raw.toLowerCase().trim();
+              const nowMs = Date.now();
+
+              const minMatch = lower.match(/^(\d+)\s*(?:m|min|mins|minutes?)$/);
+              if (minMatch) return new Date(nowMs - parseInt(minMatch[1], 10) * 60 * 1000).toISOString();
+
+              const hrMatch = lower.match(/^(\d+)\s*(?:h|hr|hrs|hours?)$/);
+              if (hrMatch) return new Date(nowMs - parseInt(hrMatch[1], 10) * 60 * 60 * 1000).toISOString();
+
+              const dayMatch = lower.match(/^(\d+)\s*(?:d|day|days)$/);
+              if (dayMatch) return new Date(nowMs - parseInt(dayMatch[1], 10) * 24 * 60 * 60 * 1000).toISOString();
+
+              if (lower.includes("yesterday")) return new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
+
+              const parsed = Date.parse(raw);
+              if (!isNaN(parsed)) return new Date(parsed).toISOString();
+
+              return new Date().toISOString();
+            };
+
+            const timestamp = parseRelativeTimestamp(rawTimeText);
 
             // ── Post ID extraction ──
             let postId = "";
