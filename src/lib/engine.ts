@@ -222,40 +222,71 @@ async function runScan() {
 const globalAny = globalThis as typeof globalThis & {
   engineInterval?: ReturnType<typeof setInterval> | null;
   lastRunTimestamp?: number;
+  wasInsideWindow?: boolean;
 };
 
 export function startEngine() {
   if (globalAny.engineInterval) {
-    console.log("[Engine] Already running.");
+    console.log("[Engine] Background scheduler already active.");
     return { status: "running" };
   }
 
-  console.log("[Engine] Started.");
-  globalAny.lastRunTimestamp = Date.now();
+  console.log("[Engine] Background scheduler started automatically.");
+  globalAny.lastRunTimestamp = 0; // Force immediate check on start
+  globalAny.wasInsideWindow = false;
 
-  // Run the first scan immediately
+  // Run initial check immediately
   runScan();
 
-  // Then check every 60 seconds if it's time for another scan
+  // Check every 30 seconds for precise designated time window triggering
   globalAny.engineInterval = setInterval(async () => {
     try {
       const user = await prisma.user.findFirst({ include: { settings: true } });
       if (!user || !user.settings) return;
 
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const parseTime = (t: string) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
+      const startTime = parseTime(user.settings.activeFrom || "00:00");
+      const endTime = parseTime(user.settings.activeTo || "23:59");
+      
+      const insideWindow =
+        startTime <= endTime
+          ? currentMinutes >= startTime && currentMinutes <= endTime
+          : currentMinutes >= startTime || currentMinutes <= endTime;
+
       const intervalMs = user.settings.scanInterval * 60 * 1000;
-      const now = Date.now();
+      const nowMs = Date.now();
       const lastRun = globalAny.lastRunTimestamp || 0;
 
-      if (now - lastRun >= intervalMs) {
-        globalAny.lastRunTimestamp = now;
+      // Auto-trigger scan if we just entered the designated active time window OR if interval has passed
+      const justEnteredWindow = insideWindow && !globalAny.wasInsideWindow;
+      const intervalPassed = nowMs - lastRun >= intervalMs;
+
+      globalAny.wasInsideWindow = insideWindow;
+
+      if (insideWindow && (justEnteredWindow || intervalPassed)) {
+        if (justEnteredWindow) {
+          console.log(`[Engine] ⏰ Designated active time arrived (${user.settings.activeFrom} - ${user.settings.activeTo}). Auto-starting scan!`);
+        }
+        globalAny.lastRunTimestamp = nowMs;
         await runScan();
       }
     } catch (error) {
-      console.error("[Engine] Interval check error:", error);
+      console.error("[Engine] Scheduler check error:", error);
     }
-  }, 60000);
+  }, 30000);
 
   return { status: "running" };
+}
+
+export function ensureEngineRunning() {
+  if (!globalAny.engineInterval) {
+    startEngine();
+  }
 }
 
 export function stopEngine() {
@@ -264,7 +295,6 @@ export function stopEngine() {
     globalAny.engineInterval = null;
     console.log("[Engine] Stopped.");
   }
-  // Also close the browser if it's still open
   automator.close().catch(() => {});
   return { status: "stopped" };
 }
