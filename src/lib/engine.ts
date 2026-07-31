@@ -200,11 +200,11 @@ async function runScan() {
         totalPostsSaved += result.savedCount;
       }
 
-      // Human-like pause between groups (5s–12s) to avoid rapid navigation patterns, but fast enough
+      // Crisp, efficient pause between groups (1.5s–3s)
       if (i < groups.length - 1) {
-        const pauseSec = Math.floor(Math.random() * 8) + 5;
-        console.log(`[Engine] Pausing ${pauseSec}s before next group...`);
-        await engineDelay(pauseSec * 1000, pauseSec * 1000 + 3000);
+        const pauseSec = Math.floor(Math.random() * 2) + 1;
+        console.log(`[Engine] Moving to next group in ${pauseSec}s...`);
+        await engineDelay(1500, 3000);
       }
     }
 

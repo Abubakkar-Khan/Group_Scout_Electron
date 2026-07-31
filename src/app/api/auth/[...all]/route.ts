@@ -1,7 +1,155 @@
-import { auth } from "@/lib/auth"; // path to your auth file
-import { toNextJsHandler } from "better-auth/next-js";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
-const handlers = toNextJsHandler(auth.handler);
+export async function GET(request: Request, context: { params: Promise<{ all: string[] }> }) {
+  const { all } = await context.params;
+  const action = all?.[0];
 
-export const GET = handlers.GET;
-export const POST = handlers.POST;
+  if (action === "me") {
+    const session = await getSession(request);
+    return NextResponse.json({ user: session?.user || null });
+  }
+
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
+}
+
+export async function POST(request: Request, context: { params: Promise<{ all: string[] }> }) {
+  const { all } = await context.params;
+  const action = all?.[0];
+
+  if (action === "login") {
+    try {
+      const { email, password } = await request.json();
+      if (!email || !password) {
+        return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+      }
+
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      }
+
+      const account = await prisma.account.findFirst({ where: { userId: user.id } });
+      if (account?.password) {
+        const isValid = bcrypt.compareSync(password, account.password);
+        if (!isValid) {
+          return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+        }
+      }
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      await prisma.session.create({
+        data: {
+          id: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          userId: user.id,
+          token,
+          expiresAt,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      const response = NextResponse.json({ user, success: true });
+      response.cookies.set("session_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        expires: expiresAt,
+        path: "/",
+      });
+      return response;
+    } catch (err: any) {
+      console.error("Login error:", err);
+      return NextResponse.json({ error: err.message || "Failed to sign in" }, { status: 500 });
+    }
+  }
+
+  if (action === "signup") {
+    try {
+      const { name, email, password } = await request.json();
+      if (!email || !password || !name) {
+        return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return NextResponse.json({ error: "User already exists" }, { status: 400 });
+      }
+
+      const userId = `usr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      const now = new Date();
+
+      const user = await prisma.user.create({
+        data: {
+          id: userId,
+          name,
+          email,
+          emailVerified: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      await prisma.account.create({
+        data: {
+          id: `acc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          userId: user.id,
+          accountId: user.id,
+          providerId: "credential",
+          password: hashedPassword,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      // Create default settings if needed
+      await prisma.settings.create({
+        data: {
+          userId: user.id,
+        },
+      }).catch(() => {});
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      await prisma.session.create({
+        data: {
+          id: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          userId: user.id,
+          token,
+          expiresAt,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      const response = NextResponse.json({ user, success: true });
+      response.cookies.set("session_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        expires: expiresAt,
+        path: "/",
+      });
+      return response;
+    } catch (err: any) {
+      console.error("Signup error:", err);
+      return NextResponse.json({ error: err.message || "Failed to create account" }, { status: 500 });
+    }
+  }
+
+  if (action === "logout") {
+    const response = NextResponse.json({ success: true });
+    response.cookies.set("session_token", "", { expires: new Date(0), path: "/" });
+    response.cookies.set("better-auth.session_token", "", { expires: new Date(0), path: "/" });
+    return response;
+  }
+
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
+}

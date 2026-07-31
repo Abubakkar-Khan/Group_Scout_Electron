@@ -33,7 +33,7 @@ function randInt(min: number, max: number): number {
 }
 
 /** Sleep for a randomised duration to mimic human pace */
-function humanDelay(minMs: number = 800, maxMs: number = 2500): Promise<void> {
+function humanDelay(minMs: number = 300, maxMs: number = 800): Promise<void> {
   return new Promise((r) => setTimeout(r, randInt(minMs, maxMs)));
 }
 
@@ -45,8 +45,8 @@ async function humanScroll(page: Page, totalPixels: number = 2000) {
     const chunk = randInt(200, 600);
     await page.evaluate((px) => window.scrollBy({ top: px, behavior: "smooth" }), chunk);
     scrolled += chunk;
-    // Short pause between scroll bursts (like reading while scrolling)
-    await humanDelay(600, 1800);
+    // Short pause between scroll bursts
+    await humanDelay(200, 600);
   }
 }
 
@@ -54,7 +54,7 @@ async function humanScroll(page: Page, totalPixels: number = 2000) {
 async function randomMouseMove(page: Page) {
   const x = randInt(100, 900);
   const y = randInt(150, 550);
-  await page.mouse.move(x, y, { steps: randInt(5, 15) });
+  await page.mouse.move(x, y, { steps: randInt(3, 8) });
 }
 
 function stableHash(value: string): string {
@@ -175,26 +175,28 @@ export class FacebookAutomator {
       }
     }
 
-    if (!fs.existsSync(CHROME_PATH)) {
-      throw new Error(`Chrome not found at ${CHROME_PATH}. Please ensure Google Chrome is installed.`);
-    }
+    const isHeadless = process.env.HEADLESS !== "false"; // Default true: invisible Chromium!
+    const useSystemChrome = process.env.USE_SYSTEM_CHROME === "true" && fs.existsSync(CHROME_PATH);
 
-    console.log("[FacebookAutomator] Launching Chrome...");
-    this.context = await chromium.launchPersistentContext(USER_DATA_DIR, {
-      executablePath: CHROME_PATH,
-      headless: process.env.HEADLESS === "true",
-      // Realistic viewport that matches a common laptop resolution
+    console.log(`[FacebookAutomator] Launching Chromium (Headless: ${isHeadless})...`);
+    
+    const launchOptions: any = {
+      headless: isHeadless,
       viewport: { width: 1366, height: 768 },
-      // Realistic locale & timezone so Facebook serves local content
       locale: "en-US",
       timezoneId: "Asia/Karachi",
       args: [
         "--disable-notifications",
         "--disable-infobars",
-        "--disable-blink-features=AutomationControlled", // hide webdriver flag
+        "--disable-blink-features=AutomationControlled",
       ],
-    });
+    };
 
+    if (useSystemChrome) {
+      launchOptions.executablePath = CHROME_PATH;
+    }
+
+    this.context = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
     this.page = this.context.pages()[0] || await this.context.newPage();
 
     // Remove the tell-tale navigator.webdriver flag
@@ -202,7 +204,7 @@ export class FacebookAutomator {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     });
 
-    console.log("[FacebookAutomator] Chrome launched successfully.");
+    console.log("[FacebookAutomator] Chromium launched successfully.");
   }
 
   async checkLogin(): Promise<boolean> {
@@ -364,6 +366,17 @@ export class FacebookAutomator {
       for (let i = 0; i < scrollSessions; i++) {
         await humanScroll(this.page, randInt(1200, 2400));
         await humanDelay(500, 1000);
+        
+        // Expand "See more" buttons on posts
+        await this.page.evaluate(() => {
+          document.querySelectorAll('div[role="button"]').forEach(btn => {
+            const text = btn.textContent?.trim().toLowerCase();
+            if (text === "see more" || text === "read more" || text === "see translation") {
+              try { (btn as HTMLElement).click(); } catch (e) {}
+            }
+          });
+        });
+
         if (Math.random() > 0.7) {
           await randomMouseMove(this.page);
         }
@@ -573,9 +586,48 @@ export class FacebookAutomator {
     }
   }
 
+  async fetchGroupMetadata(groupId: string): Promise<{ name: string; iconUrl: string }> {
+    if (!this.page || this.page.isClosed()) {
+      await this.init();
+    }
+    if (!this.page) return { name: groupId, iconUrl: "" };
+
+    const groupUrl = `https://www.facebook.com/groups/${groupId}`;
+    console.log(`[FacebookAutomator] Fetching metadata immediately for group: ${groupId}`);
+    
+    try {
+      await this.page.goto(groupUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+      await humanDelay(400, 800);
+
+      const info = await this.page.evaluate(() => {
+        let name = "";
+        let icon = "";
+        
+        const h1 = document.querySelector('h1');
+        if (h1) name = h1.innerText.trim();
+        
+        const exactCover = document.querySelector('img[data-imgperflogname="profileCoverPhoto"]');
+        if (exactCover) {
+          icon = exactCover.getAttribute('src') || "";
+        } else {
+          const images = Array.from(document.querySelectorAll('img'));
+          const coverImg = images.find(img => (name && img.getAttribute('alt')?.includes(name)) || img.getAttribute('alt')?.toLowerCase().includes('cover'));
+          if (coverImg) icon = coverImg.getAttribute('src') || "";
+        }
+        
+        return { name, icon };
+      });
+
+      return { name: info.name || groupId, iconUrl: info.icon || "" };
+    } catch (e) {
+      console.error(`[FacebookAutomator] Error fetching metadata for group ${groupId}:`, e);
+      return { name: groupId, iconUrl: "" };
+    }
+  }
+
   async close() {
     if (this.context) {
-      console.log("[FacebookAutomator] Closing Chrome...");
+      console.log("[FacebookAutomator] Closing Chromium...");
       await this.context.close();
       this.context = null;
       this.page = null;

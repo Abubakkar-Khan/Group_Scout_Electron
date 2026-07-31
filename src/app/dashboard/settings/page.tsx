@@ -31,7 +31,7 @@ export default function SettingsPage() {
     activeTo: "20:00",
     monitoringMode: "default",
     groqApiKey: "",
-    useGroq: true,
+    useGroq: false,
     groqSystemPrompt: ""
   })
   const [loading, setLoading] = useState(true)
@@ -51,7 +51,7 @@ export default function SettingsPage() {
             activeTo: data.activeTo || "20:00",
             monitoringMode: data.monitoringMode || "default",
             groqApiKey: data.groqApiKey ? "********" : "", // Mask the actual key
-            useGroq: data.useGroq ?? true,
+            useGroq: data.useGroq ?? false,
             groqSystemPrompt: data.groqSystemPrompt || ""
           })
         }

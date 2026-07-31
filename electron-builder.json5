@@ -1,0 +1,26 @@
+{
+  appId: "com.groupscout.app",
+  productName: "GroupScout",
+  directories: {
+    output: "release"
+  },
+  asar: true,
+  files: [
+    "dist-electron/**/*",
+    ".next/**/*",
+    "public/**/*",
+    "package.json",
+    ".env"
+  ],
+  win: {
+    target: ["nsis"],
+    icon: "public/icon.ico"
+  },
+  nsis: {
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: "GroupScout"
+  }
+}

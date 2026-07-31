@@ -183,4 +183,4 @@ erDiagram
 - **Backend Engine:** Playwright, Node.js Intervals.
 - **Database:** Prisma ORM, PostgreSQL.
 - **AI:** Groq SDK (llama-3.1-8b-instant).
-- **Authentication:** Better Auth.
+- **Authentication:** Custom Session Auth.

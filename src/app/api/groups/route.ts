@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
 import { Prisma } from "@prisma/client"
-
 import { prisma } from "@/lib/db"
+import { FacebookAutomator } from "@/lib/facebook"
 
 function extractFacebookGroupId(value: string): string | null {
   const trimmed = value.trim()
@@ -59,11 +59,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid Facebook Group URL" }, { status: 400 })
     }
 
+    // Try to immediately scrape group name & image
+    let groupName = facebookGroupId
+    let iconUrl = ""
+
+    try {
+      const automator = new FacebookAutomator()
+      const meta = await automator.fetchGroupMetadata(facebookGroupId)
+      if (meta.name) groupName = meta.name
+      if (meta.iconUrl) iconUrl = meta.iconUrl
+    } catch (err) {
+      console.warn(`[API Groups] Quick metadata fetch failed for ${facebookGroupId}, using fallback ID:`, err)
+    }
+
     const group = await prisma.monitoredGroup.create({
       data: {
         userId: session.user.id,
         facebookGroupId,
-        name: facebookGroupId, // Default to the ID since we can't easily scrape it from the server
+        name: groupName,
+        iconUrl: iconUrl || null,
         enabled: true
       }
     })

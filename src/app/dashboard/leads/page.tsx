@@ -103,7 +103,7 @@ export default function LeadsPage() {
             <Select
               value={filter}
               onValueChange={(value) => {
-                setFilter(value)
+                if (value) setFilter(value)
                 setPage(1)
               }}
             >

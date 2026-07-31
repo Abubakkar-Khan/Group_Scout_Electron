@@ -1,0 +1,271 @@
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from "electron";
+import path from "path";
+import http from "http";
+import net from "net";
+import { spawn, fork, ChildProcess } from "child_process";
+import dotenv from "dotenv";
+
+// Load environment variables from .env file if available
+dotenv.config({ path: path.join(app.getAppPath(), ".env") });
+
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let serverProcess: ChildProcess | null = null;
+let isQuitting = false;
+
+const isDev = !app.isPackaged;
+const DEFAULT_PORT = 3000;
+
+// Enforce single instance lock
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+/**
+ * Find an available TCP port starting from startPort
+ */
+function findAvailablePort(startPort: number): Promise<number> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(startPort, "127.0.0.1", () => {
+      const port = (server.address() as net.AddressInfo).port;
+      server.close(() => resolve(port));
+    });
+    server.on("error", () => {
+      resolve(findAvailablePort(startPort + 1));
+    });
+  });
+}
+
+/**
+ * Wait for Next.js HTTP server to respond with HTTP 200
+ */
+function waitForServer(port: number, timeoutMs = 45000): Promise<void> {
+  const startTime = Date.now();
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const req = http.get(`http://127.0.0.1:${port}`, (res) => {
+        if (res.statusCode && res.statusCode < 500) {
+          resolve();
+        } else {
+          retry();
+        }
+      });
+
+      req.on("error", () => retry());
+      req.end();
+    };
+
+    const retry = () => {
+      if (Date.now() - startTime > timeoutMs) {
+        reject(new Error(`Timeout waiting for Next.js server on port ${port}`));
+      } else {
+        setTimeout(check, 250);
+      }
+    };
+
+    check();
+  });
+}
+
+/**
+ * Start the Next.js production server using Node's internal module loader
+ */
+async function startNextServer(port: number): Promise<void> {
+  if (isDev) {
+    // In dev mode, 'next dev' is already started by concurrently script
+    return;
+  }
+
+  const appPath = app.getAppPath();
+  const nextBin = path.join(appPath, "node_modules", "next", "dist", "bin", "next");
+
+  const serverEnv = {
+    ...process.env,
+    PORT: port.toString(),
+    NEXT_PUBLIC_APP_URL: `http://localhost:${port}`,
+  };
+
+  // child_process.fork uses Node's module loader which natively reads inside app.asar
+  serverProcess = fork(nextBin, ["start", "-p", port.toString()], {
+    cwd: appPath,
+    env: serverEnv,
+    stdio: "inherit",
+  });
+
+  serverProcess.on("error", (err) => {
+    console.error("Failed to start Next.js production server:", err);
+    dialog.showErrorBox(
+      "Next.js Server Process Error",
+      `Failed to start Next.js process from ${nextBin}:\n\n${err.stack || err.message}`
+    );
+  });
+
+  serverProcess.on("exit", (code, signal) => {
+    console.log(`Next.js server exited with code ${code} signal ${signal}`);
+  });
+}
+
+/**
+ * Create or return application icon
+ */
+function getAppIcon(): Electron.NativeImage {
+  const iconPath = path.join(app.getAppPath(), "public", "icon.png");
+  try {
+    const img = nativeImage.createFromPath(iconPath);
+    if (!img.isEmpty()) return img;
+  } catch (e) {
+    // Fallback if image fails to load
+  }
+  // Fallback to empty nativeImage
+  return nativeImage.createEmpty();
+}
+
+/**
+ * Create System Tray icon and menu
+ */
+function createTray() {
+  const icon = getAppIcon();
+  tray = new Tray(icon);
+  tray.setToolTip("GroupScout Desktop");
+
+  const updateMenu = () => {
+    const loginItemSettings = app.getLoginItemSettings();
+    const autoLaunchEnabled = loginItemSettings.openAtLogin;
+
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: "Open GroupScout",
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        },
+      },
+      {
+        label: "Start on Windows Boot",
+        type: "checkbox",
+        checked: autoLaunchEnabled,
+        click: (item) => {
+          app.setLoginItemSettings({
+            openAtLogin: item.checked,
+            path: process.execPath,
+          });
+          updateMenu();
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Quit GroupScout",
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+      },
+    ]);
+
+    tray?.setContextMenu(contextMenu);
+  };
+
+  updateMenu();
+
+  tray.on("double-click", () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+/**
+ * Create Main Electron Window
+ */
+async function createWindow(serverUrl: string) {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    title: "GroupScout",
+    icon: getAppIcon(),
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  mainWindow.loadURL(serverUrl);
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
+  });
+
+  // Minimize to tray instead of quitting when close button is clicked
+  mainWindow.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+}
+
+// Setup IPC handlers
+ipcMain.handle("app:version", () => app.getVersion());
+
+app.whenReady().then(async () => {
+  try {
+    const port = isDev ? DEFAULT_PORT : await findAvailablePort(DEFAULT_PORT);
+    const serverUrl = `http://localhost:${port}`;
+
+    if (!isDev) {
+      await startNextServer(port);
+    }
+
+    await waitForServer(port);
+    createTray();
+    await createWindow(serverUrl);
+  } catch (error: any) {
+    console.error("Initialization error:", error);
+    dialog.showErrorBox(
+      "GroupScout Startup Error",
+      `Failed to launch application:\n\n${error?.stack || error?.message || String(error)}`
+    );
+    app.quit();
+  }
+});
+
+app.on("window-all-closed", () => {
+  // Do not quit on window close to keep background automations running in tray
+});
+
+app.on("activate", () => {
+  if (mainWindow === null) {
+    const port = isDev ? DEFAULT_PORT : DEFAULT_PORT;
+    createWindow(`http://localhost:${port}`);
+  }
+});
+
+app.on("before-quit", () => {
+  isQuitting = true;
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
+  }
+});

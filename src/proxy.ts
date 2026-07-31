@@ -2,8 +2,8 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export async function proxy(request: NextRequest) {
-  const sessionCookie = request.cookies.get("better-auth.session_token")?.value
-  const secureSessionCookie = request.cookies.get("__Secure-better-auth.session_token")?.value
+  const sessionCookie = request.cookies.get("session_token")?.value || request.cookies.get("better-auth.session_token")?.value
+  const secureSessionCookie = request.cookies.get("__Secure-session_token")?.value || request.cookies.get("__Secure-better-auth.session_token")?.value
   const sessionId = sessionCookie || secureSessionCookie
   
   const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard")

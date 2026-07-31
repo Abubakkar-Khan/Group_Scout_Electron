@@ -1,22 +1,22 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// --- Better Auth Models ---
+// --- Auth Models ---
 
 model User {
   id            String    @id
   name          String
   email         String
-  emailVerified Boolean
+  emailVerified Boolean   @default(false)
   image         String?
-  createdAt     DateTime
-  updatedAt     DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
   
@@ -34,8 +34,8 @@ model Session {
   id        String   @id
   expiresAt DateTime
   token     String
-  createdAt DateTime
-  updatedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
   userId    String
@@ -58,8 +58,8 @@ model Account {
   refreshTokenExpiresAt DateTime?
   scope                 String?
   password              String?
-  createdAt             DateTime
-  updatedAt             DateTime
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@map("account")
 }
@@ -69,8 +69,8 @@ model Verification {
   identifier String
   value      String
   expiresAt  DateTime
-  createdAt  DateTime?
-  updatedAt  DateTime?
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
 
   @@map("verification")
 }
@@ -124,7 +124,7 @@ model Post {
   keyword        String
   content        String
   url            String
-  relevant       Boolean
+  relevant       Boolean  @default(true)
   viewed         Boolean  @default(false)
   createdAt      DateTime @default(now())
 
@@ -132,15 +132,15 @@ model Post {
 }
 
 model Settings {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scanInterval    Int      @default(5)
-  activeFrom      String   @default("08:00")
-  activeTo        String   @default("20:00")
-  monitoringMode  String   @default("default")
-  autoScrollPages Int      @default(5)
-  groqApiKey      String?  // Encrypted API key
-  useGroq         Boolean  @default(true)
-  groqSystemPrompt String  @default("You are a lead classifier. Determine if this Facebook post is genuinely looking for the service related to the provided keywords. Respond ONLY with valid JSON: {\"relevant\": true/false}")
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scanInterval     Int      @default(5)
+  activeFrom       String   @default("08:00")
+  activeTo         String   @default("20:00")
+  monitoringMode   String   @default("default")
+  autoScrollPages  Int      @default(5)
+  groqApiKey       String?  // Encrypted API key
+  useGroq          Boolean  @default(false)
+  groqSystemPrompt String   @default("You are a lead classifier. Determine if this Facebook post is genuinely looking for the service related to the provided keywords. Respond ONLY with valid JSON: {\"relevant\": true/false}")
 }

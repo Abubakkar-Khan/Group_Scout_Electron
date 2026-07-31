@@ -48,4 +48,6 @@ next-env.d.ts
 /chrome-data/
 /prisma/*.db
 /prisma/*.db-journal
+/dist-electron/
+/release/
 *.log
