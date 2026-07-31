@@ -278,10 +278,6 @@ export class FacebookAutomator {
     return true;
   }
 
-    console.log("[FacebookAutomator] ✅ Already logged in. Current URL:", currentUrl);
-    return true;
-  }
-
   async scanGroup(groupId: string, maxPosts: number = 15, scrollDepth: number = 5): Promise<{ posts: FacebookPost[], groupName: string, iconUrl: string }> {
     if (!this.page) throw new Error("Not initialized");
 
