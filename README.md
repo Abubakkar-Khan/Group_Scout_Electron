@@ -1,11 +1,11 @@
-# GroupScout 🎯
+# GroupScout
 > **Automated High-Intent Facebook Lead Generation & Group Monitoring**
 
 GroupScout is an Electron & Next.js desktop software that automatically monitors Facebook Groups for high-intent lead opportunities. It runs an invisible background **Chromium** engine powered by Playwright to intercept Facebook network traffic, match your target keywords, and capture leads into a local **SQLite** database and live dashboard.
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 1. [Executive Summary](#1-executive-summary)
 2. [Key Capabilities & Features](#2-key-capabilities--features)
 3. [System Architecture & Workflow](#3-system-architecture--workflow)
@@ -28,12 +28,12 @@ GroupScout is an Electron & Next.js desktop software that automatically monitors
 
 ## 2. Key Capabilities & Features
 
-* 👻 **Invisible Background Chromium Engine**: Operates silently in headless mode using Playwright. No annoying browser popups or stolen mouse focus.
-* ⚡ **Dual Extraction Pipeline**: Combines hidden **GraphQL Network Interception** (listening to raw JSON payloads) with **DOM Parsing Fallbacks** for 100% extraction accuracy.
-* 🖼️ **Instant Group Metadata Scraping**: The second you add a Facebook Group URL, GroupScout automatically fetches its real group title and cover photo upfront.
-* 🚀 **Instant Lead Processing**: AI relevance filtering (`useGroq`) is turned **OFF by default**, meaning matched posts become active leads on your dashboard within seconds. (You can enable Groq LLaMA 3 AI filtering whenever needed in Settings).
-* 🔒 **Local & Private Data**: All your extracted leads, keywords, and group data stay stored locally in your **SQLite** database (`dev.db`). Only user login authentication routes through **Neon PostgreSQL**.
-* 🛡️ **Anti-Detection Shield**: Mimics human behavior with randomized micro-scrolling, human pauses (300ms–800ms), and automated `webdriver` evasion flags to keep your Facebook account safe.
+* **Invisible Background Chromium Engine**: Operates silently in headless mode using Playwright. No browser popups or stolen mouse focus.
+* **Dual Extraction Pipeline**: Combines hidden **GraphQL Network Interception** (listening to raw JSON payloads) with **DOM Parsing Fallbacks** for 100% extraction accuracy.
+* **Instant Group Metadata Scraping**: The second you add a Facebook Group URL, GroupScout automatically fetches its real group title and cover photo upfront.
+* **Instant Lead Processing**: AI relevance filtering (`useGroq`) is turned **OFF by default**, meaning matched posts become active leads on your dashboard within seconds. (You can enable Groq LLaMA 3 AI filtering whenever needed in Settings).
+* **Local & Private Data**: All your extracted leads, keywords, and group data stay stored locally in your **SQLite** database (`dev.db`). Only user login authentication routes through **Neon PostgreSQL**.
+* **Anti-Detection Shield**: Mimics human behavior with randomized micro-scrolling, human pauses (300ms–800ms), and automated `webdriver` evasion flags to keep your Facebook account safe.
 
 ---
 
