@@ -170,18 +170,30 @@ async function runScan() {
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const parseTime = (t: string) => {
-      const [h, m] = t.split(":").map(Number);
-      return h * 60 + m;
+      if (!t || t === "24h" || t === "ALL") return null;
+      const clean = t.trim().split(" ")[0];
+      const parts = clean.split(":").map(Number);
+      if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+      return parts[0] * 60 + parts[1];
     };
-    const startTime = parseTime(settings.activeFrom || "00:00");
-    const endTime = parseTime(settings.activeTo || "23:59");
-    const insideWindow =
-      startTime <= endTime
-        ? currentMinutes >= startTime && currentMinutes <= endTime
-        : currentMinutes >= startTime || currentMinutes <= endTime;
+
+    const startTime = parseTime(settings.activeFrom);
+    const endTime = parseTime(settings.activeTo);
+
+    let insideWindow = true;
+    if (startTime !== null && endTime !== null) {
+      if (startTime === 0 && endTime >= 1439) {
+        insideWindow = true; // 24-hour mode
+      } else if (startTime <= endTime) {
+        insideWindow = currentMinutes >= startTime && currentMinutes <= endTime;
+      } else {
+        insideWindow = currentMinutes >= startTime || currentMinutes <= endTime; // overnight schedule
+      }
+    }
 
     if (!insideWindow) {
-      await logEngineEvent(user.id, "INFO", `Outside designated active hours (${settings.activeFrom}-${settings.activeTo}). Standing by.`);
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      await logEngineEvent(user.id, "INFO", `Current time (${timeStr}) is outside your active operating hours (${settings.activeFrom} to ${settings.activeTo}). Standing by until active window. (Set Active Hours to 00:00 - 23:59 in Settings for 24/7 scanning).`);
       await automator.close();
       return;
     }
