@@ -334,7 +334,7 @@ export default function SettingsPage() {
               <Clock className="size-5 text-muted-foreground" />
               <CardTitle className="text-lg">Operating Schedule & Active Hours</CardTitle>
             </div>
-            <CardDescription className="text-xs text-muted-foreground">Type custom start and end times in 24-hour format (e.g. 0830 -> 08:30) or click a quick preset.</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">Type custom start and end times in 24-hour format (e.g. 0830 to 08:30) or click a quick preset.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-1">
             <div className="grid gap-5 md:grid-cols-2">
@@ -367,7 +367,7 @@ export default function SettingsPage() {
                 )}
                 <p className="text-[11px] text-muted-foreground">Numbers only (e.g. type 2000 for 20:00).</p>
               </div>
-            </div>v>
+            </div>
 
             {/* Quick Presets */}
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/40">
