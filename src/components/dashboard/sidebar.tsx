@@ -36,17 +36,15 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
     >
       <div className="flex h-14 items-center justify-between px-4 border-b border-border shrink-0">
         {!collapsed && (
-          <Link href="/dashboard" className="font-semibold tracking-tight flex items-center gap-2">
-            <div className="size-6 rounded bg-white text-black flex items-center justify-center font-bold text-xs">
-              G
-            </div>
-            GroupScout
+          <Link href="/dashboard" className="font-semibold tracking-tight flex items-center gap-2 text-foreground">
+            <img src="/gs.webp" alt="GroupScout" className="size-7 rounded-lg object-contain" />
+            <span className="text-base font-bold">GroupScout</span>
           </Link>
         )}
         {collapsed && (
-          <div className="size-6 rounded bg-white text-black flex items-center justify-center font-bold text-xs mx-auto">
-            G
-          </div>
+          <Link href="/dashboard" className="mx-auto">
+            <img src="/gs.webp" alt="GroupScout" className="size-7 rounded-lg object-contain" />
+          </Link>
         )}
       </div>
 
