@@ -152,6 +152,8 @@ model Settings {
   activeTo             String   @default("20:00")
   monitoringMode       String   @default("default")
   autoScrollPages      Int      @default(5)
+  scrollSpeed          String   @default("medium") // "fast", "medium", "slow", "human"
+  interGroupDelaySeconds Int    @default(3)        // Pause between group scans
   maxPostAgeHours      Int      @default(48)
   autoDeleteViewedDays Int      @default(30)
   groqApiKey           String?  // Encrypted API key

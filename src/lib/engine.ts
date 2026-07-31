@@ -209,7 +209,8 @@ async function runScan() {
       const { posts, groupName, iconUrl } = await automator.scanGroup(
         group.facebookGroupId,
         maxPosts,
-        settings.autoScrollPages
+        settings.autoScrollPages,
+        settings.scrollSpeed || "medium"
       );
       totalPostsScraped += posts.length;
 
@@ -246,9 +247,10 @@ async function runScan() {
         totalPostsSaved += result.savedCount;
       }
 
-      // Crisp, efficient pause between groups (1.5s–3s)
+      // Pause between groups according to user's interGroupDelaySeconds setting
       if (i < groups.length - 1) {
-        await engineDelay(1500, 3000);
+        const delaySec = settings.interGroupDelaySeconds || 3;
+        await engineDelay(delaySec * 1000, (delaySec + 1.5) * 1000);
       }
     }
 

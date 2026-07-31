@@ -24,12 +24,14 @@ export async function GET() {
       userId: session.user.id,
       scanInterval: settings.scanInterval,
       autoScrollPages: settings.autoScrollPages,
+      scrollSpeed: settings.scrollSpeed ?? "medium",
+      interGroupDelaySeconds: settings.interGroupDelaySeconds ?? 3,
       activeFrom: settings.activeFrom,
       activeTo: settings.activeTo,
       monitoringMode: settings.monitoringMode,
       maxPostAgeHours: settings.maxPostAgeHours ?? 48,
       autoDeleteViewedDays: settings.autoDeleteViewedDays ?? 30,
-      groqApiKey: !!settings.groqApiKey, // Only return a boolean indicating if it's set
+      groqApiKey: !!settings.groqApiKey,
       useGroq: settings.useGroq,
       groqSystemPrompt: settings.groqSystemPrompt,
     })
@@ -44,11 +46,26 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json()
-    const { scanInterval, autoScrollPages, activeFrom, activeTo, monitoringMode, maxPostAgeHours, autoDeleteViewedDays, groqApiKey, useGroq, groqSystemPrompt } = body
+    const { 
+      scanInterval, 
+      autoScrollPages, 
+      scrollSpeed, 
+      interGroupDelaySeconds, 
+      activeFrom, 
+      activeTo, 
+      monitoringMode, 
+      maxPostAgeHours, 
+      autoDeleteViewedDays, 
+      groqApiKey, 
+      useGroq, 
+      groqSystemPrompt 
+    } = body
 
     const settingsData = {
       scanInterval: isNaN(scanInterval) || scanInterval === null ? 5 : scanInterval,
       autoScrollPages: isNaN(autoScrollPages) || autoScrollPages === null ? 5 : autoScrollPages,
+      scrollSpeed: scrollSpeed || "medium",
+      interGroupDelaySeconds: isNaN(interGroupDelaySeconds) || interGroupDelaySeconds === null ? 3 : interGroupDelaySeconds,
       activeFrom: activeFrom || "08:00",
       activeTo: activeTo || "20:00",
       monitoringMode: monitoringMode || "default",
@@ -56,7 +73,7 @@ export async function PATCH(request: Request) {
       autoDeleteViewedDays: isNaN(autoDeleteViewedDays) || autoDeleteViewedDays === null ? 30 : autoDeleteViewedDays,
     } satisfies Pick<
       Prisma.SettingsUncheckedCreateInput,
-      "scanInterval" | "autoScrollPages" | "activeFrom" | "activeTo" | "monitoringMode" | "maxPostAgeHours" | "autoDeleteViewedDays"
+      "scanInterval" | "autoScrollPages" | "scrollSpeed" | "interGroupDelaySeconds" | "activeFrom" | "activeTo" | "monitoringMode" | "maxPostAgeHours" | "autoDeleteViewedDays"
     >
 
     const updateData: Prisma.SettingsUncheckedUpdateInput = { ...settingsData }
@@ -89,6 +106,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({
       scanInterval: settings.scanInterval,
       autoScrollPages: settings.autoScrollPages,
+      scrollSpeed: settings.scrollSpeed,
+      interGroupDelaySeconds: settings.interGroupDelaySeconds,
       activeFrom: settings.activeFrom,
       activeTo: settings.activeTo,
       monitoringMode: settings.monitoringMode,

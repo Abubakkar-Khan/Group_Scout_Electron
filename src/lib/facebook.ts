@@ -38,15 +38,18 @@ function humanDelay(minMs: number = 300, maxMs: number = 800): Promise<void> {
 }
 
 /** Smooth, human-like scroll: small increments with random pauses */
-async function humanScroll(page: Page, totalPixels: number = 2000) {
+async function humanScroll(page: Page, totalPixels: number = 2000, speed: string = "medium") {
   let scrolled = 0;
+  const chunkMin = speed === "fast" ? 500 : speed === "slow" ? 150 : 250;
+  const chunkMax = speed === "fast" ? 900 : speed === "slow" ? 400 : 650;
+  const delayMin = speed === "fast" ? 100 : speed === "slow" ? 600 : 250;
+  const delayMax = speed === "fast" ? 300 : speed === "slow" ? 1200 : 600;
+
   while (scrolled < totalPixels) {
-    // Humans scroll in bursts of 200–600px
-    const chunk = randInt(200, 600);
+    const chunk = randInt(chunkMin, chunkMax);
     await page.evaluate((px) => window.scrollBy({ top: px, behavior: "smooth" }), chunk);
     scrolled += chunk;
-    // Short pause between scroll bursts
-    await humanDelay(200, 600);
+    await humanDelay(delayMin, delayMax);
   }
 }
 
@@ -278,7 +281,7 @@ export class FacebookAutomator {
     return true;
   }
 
-  async scanGroup(groupId: string, maxPosts: number = 15, scrollDepth: number = 5): Promise<{ posts: FacebookPost[], groupName: string, iconUrl: string }> {
+  async scanGroup(groupId: string, maxPosts: number = 15, scrollDepth: number = 5, scrollSpeed: string = "medium"): Promise<{ posts: FacebookPost[], groupName: string, iconUrl: string }> {
     if (!this.page) throw new Error("Not initialized");
 
     const groupUrl = `https://www.facebook.com/groups/${groupId}?sorting_setting=CHRONOLOGICAL`;
@@ -390,7 +393,7 @@ export class FacebookAutomator {
       // Scroll like a human browsing through the feed to trigger GraphQL requests
       const scrollSessions = Math.max(2, Math.min(8, scrollDepth || 5));
       for (let i = 0; i < scrollSessions; i++) {
-        await humanScroll(this.page, randInt(1200, 2400));
+        await humanScroll(this.page, randInt(1200, 2400), scrollSpeed);
         await humanDelay(500, 1000);
         
         // Expand "See more" buttons on posts
