@@ -342,7 +342,7 @@ export default function SettingsPage() {
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-foreground">Active Start Time</Label>
-                {loading ? <Skeleton className="h-14 w-full rounded-xl" /> : (
+                {loading ? <Skeleton className="h-9 w-36 rounded-lg" /> : (
                   <TimeSetter
                     value={settings.activeFrom}
                     onChange={(val) => setSettings({ ...settings, activeFrom: val })}
@@ -353,7 +353,7 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-foreground">Active End Time</Label>
-                {loading ? <Skeleton className="h-14 w-full rounded-xl" /> : (
+                {loading ? <Skeleton className="h-9 w-36 rounded-lg" /> : (
                   <TimeSetter
                     value={settings.activeTo}
                     onChange={(val) => setSettings({ ...settings, activeTo: val })}

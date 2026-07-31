@@ -12,7 +12,6 @@ interface TimeSetterProps {
 }
 
 export function TimeSetter({ value, onChange, label, className }: TimeSetterProps) {
-  // Parse HH:MM
   const parse = (val: string) => {
     const parts = (val || "00:00").split(":")
     let h = parseInt(parts[0], 10)
@@ -76,72 +75,76 @@ export function TimeSetter({ value, onChange, label, className }: TimeSetterProp
   const mStr = m.toString().padStart(2, "0")
 
   return (
-    <div className={cn("space-y-1.5", className)}>
-      {label && <span className="text-xs font-semibold text-foreground">{label}</span>}
-      <div className="flex items-center gap-3 p-2.5 rounded-xl bg-card/60 border border-border/80 shadow-md backdrop-blur-md w-full sm:w-auto min-w-[200px]">
-        <Clock className="size-4 text-emerald-400 shrink-0 ml-1" />
+    <div className={cn("space-y-1", className)}>
+      {label && <span className="text-[11px] font-semibold text-foreground">{label}</span>}
+      <div className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-card/50 border border-border/70 hover:border-border transition-colors w-fit">
+        <Clock className="size-3.5 text-emerald-400 shrink-0" />
         
-        <div className="flex items-center gap-1 font-mono text-base font-bold text-foreground mx-auto">
-          {/* Hours Block */}
-          <div className="flex flex-col items-center">
-            <button
-              type="button"
-              onClick={() => update(h + 1, m)}
-              className="p-0.5 text-muted-foreground hover:text-emerald-400 transition-colors"
-              title="Increase Hour"
-            >
-              <ChevronUp className="size-4" />
-            </button>
+        <div className="flex items-center gap-0.5 font-mono text-xs font-semibold text-foreground">
+          {/* Hours Input + Stepper */}
+          <div className="flex items-center gap-0.5 group">
             <input
               type="text"
               value={hStr}
               onChange={handleHourChange}
               onKeyDown={handleHourKeyDown}
-              className="w-10 text-center bg-background/60 border border-border/60 rounded-md py-1 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 selection:bg-emerald-500/30"
+              className="w-7 text-center bg-background/50 border border-border/40 rounded px-0.5 py-0.5 text-xs font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               maxLength={2}
             />
-            <button
-              type="button"
-              onClick={() => update(h - 1, m)}
-              className="p-0.5 text-muted-foreground hover:text-emerald-400 transition-colors"
-              title="Decrease Hour"
-            >
-              <ChevronDown className="size-4" />
-            </button>
+            <div className="flex flex-col -space-y-1">
+              <button
+                type="button"
+                onClick={() => update(h + 1, m)}
+                className="text-muted-foreground hover:text-emerald-400 p-0"
+                title="Increase Hour"
+              >
+                <ChevronUp className="size-2.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => update(h - 1, m)}
+                className="text-muted-foreground hover:text-emerald-400 p-0"
+                title="Decrease Hour"
+              >
+                <ChevronDown className="size-2.5" />
+              </button>
+            </div>
           </div>
 
-          <span className="text-emerald-400/80 animate-pulse text-lg pb-1">:</span>
+          <span className="text-emerald-400/80 font-bold px-0.5">:</span>
 
-          {/* Minutes Block */}
-          <div className="flex flex-col items-center">
-            <button
-              type="button"
-              onClick={() => update(h, m + 15)}
-              className="p-0.5 text-muted-foreground hover:text-emerald-400 transition-colors"
-              title="Increase Minutes (+15m)"
-            >
-              <ChevronUp className="size-4" />
-            </button>
+          {/* Minutes Input + Stepper */}
+          <div className="flex items-center gap-0.5 group">
             <input
               type="text"
               value={mStr}
               onChange={handleMinuteChange}
               onKeyDown={handleMinuteKeyDown}
-              className="w-10 text-center bg-background/60 border border-border/60 rounded-md py-1 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 selection:bg-emerald-500/30"
+              className="w-7 text-center bg-background/50 border border-border/40 rounded px-0.5 py-0.5 text-xs font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               maxLength={2}
             />
-            <button
-              type="button"
-              onClick={() => update(h, m - 15)}
-              className="p-0.5 text-muted-foreground hover:text-emerald-400 transition-colors"
-              title="Decrease Minutes (-15m)"
-            >
-              <ChevronDown className="size-4" />
-            </button>
+            <div className="flex flex-col -space-y-1">
+              <button
+                type="button"
+                onClick={() => update(h, m + 15)}
+                className="text-muted-foreground hover:text-emerald-400 p-0"
+                title="Increase Minutes (+15m)"
+              >
+                <ChevronUp className="size-2.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => update(h, m - 15)}
+                className="text-muted-foreground hover:text-emerald-400 p-0"
+                title="Decrease Minutes (-15m)"
+              >
+                <ChevronDown className="size-2.5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        <span className="text-[11px] font-medium text-muted-foreground pr-1 shrink-0">
+        <span className="text-[10px] font-mono text-muted-foreground ml-1">
           {h >= 12 ? "PM" : "AM"}
         </span>
       </div>
