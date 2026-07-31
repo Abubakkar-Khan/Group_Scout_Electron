@@ -80,10 +80,23 @@ export default function KeywordsPage() {
       try {
         await fetch(`/api/keywords/${id}`, {
           method: "PATCH",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled })
         })
       } catch {
         toast.error("Failed to update keyword")
+        fetchData()
+      }
+    } else {
+      setNegativeKeywords(negativeKeywords.map(k => k.id === id ? { ...k, enabled } : k))
+      try {
+        await fetch(`/api/keywords/negative?id=${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled })
+        })
+      } catch {
+        toast.error("Failed to update negative keyword")
         fetchData()
       }
     }
@@ -183,12 +196,10 @@ export default function KeywordsPage() {
                   <div key={kw.id} className="flex items-center justify-between p-3 border border-border/50 rounded-lg bg-background/30 hover:bg-background/50 transition-colors">
                     <span className="font-medium">{kw.keyword}</span>
                     <div className="flex items-center gap-4">
-                      {activeTab === "positive" && (
-                        <Switch 
-                          checked={kw.enabled} 
-                          onCheckedChange={(c) => toggleKeyword(kw.id, c)} 
-                        />
-                      )}
+                      <Switch 
+                        checked={kw.enabled} 
+                        onCheckedChange={(c) => toggleKeyword(kw.id, c)} 
+                      />
                       <Button 
                         variant="ghost" 
                         size="icon" 

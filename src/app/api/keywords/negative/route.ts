@@ -47,6 +47,37 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get("id")
+
+  if (!id) {
+    return NextResponse.json({ error: "ID is required" }, { status: 400 })
+  }
+
+  try {
+    const body = await request.json()
+    const { enabled } = body
+
+    const existing = await prisma.negativeKeyword.findUnique({ where: { id } })
+    if (!existing || existing.userId !== session.user.id) {
+      return NextResponse.json({ error: "Negative keyword not found" }, { status: 404 })
+    }
+
+    const updated = await prisma.negativeKeyword.update({
+      where: { id },
+      data: { enabled: Boolean(enabled) },
+    })
+
+    return NextResponse.json(updated)
+  } catch {
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
