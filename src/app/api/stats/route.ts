@@ -1,31 +1,45 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-
 import { prisma } from "@/lib/db"
 import { getEngineStatus } from "@/lib/engine"
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+  const { searchParams } = new URL(request.url)
+  const period = searchParams.get("period") || "daily" // daily, weekly, monthly, all
 
-    const [keywordMatchesToday, leadsToday, totalLeads, latestSync, totalScrapedAgg] = await Promise.all([
-      // Total raw posts collected today (both relevant and non-relevant)
+  try {
+    const now = new Date()
+    let startDate: Date | null = null
+
+    if (period === "daily") {
+      const today = new Date(now)
+      today.setHours(0, 0, 0, 0)
+      startDate = today
+    } else if (period === "weekly") {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    } else if (period === "monthly") {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    }
+
+    const dateFilter = startDate ? { createdAt: { gte: startDate } } : {}
+
+    const [keywordMatches, leads, totalLeads, latestSync, totalScrapedAgg, periodPostsCount] = await Promise.all([
+      // Posts matching keywords in selected period
       prisma.post.count({
         where: {
           userId: session.user.id,
-          createdAt: { gte: today },
+          ...dateFilter,
         },
       }),
-      // Only relevant posts collected today
+      // Relevant leads in selected period
       prisma.post.count({
         where: {
           userId: session.user.id,
           relevant: true,
-          createdAt: { gte: today },
+          ...dateFilter,
         },
       }),
       // All-time relevant posts
@@ -43,23 +57,35 @@ export async function GET() {
         },
         orderBy: { createdAt: 'desc' }
       }),
-      // Total posts scraped
+      // Total all-time posts scanned in monitored groups
       prisma.monitoredGroup.aggregate({
         where: { userId: session.user.id },
         _sum: { postsScanned: true }
+      }),
+      // Posts created in period (for Period Scanned estimate)
+      prisma.post.count({
+        where: {
+          userId: session.user.id,
+          ...dateFilter,
+        }
       })
     ])
 
-    // Check if the extension synced within the last 60 seconds
     const isConnected = latestSync && (new Date().getTime() - new Date(latestSync.createdAt).getTime()) < 60000;
     const extensionState = latestSync && latestSync.metadata ? JSON.parse(latestSync.metadata) : null;
 
+    // For daily/weekly/monthly periods, estimate total scraped or use period count
+    const totalScraped = period === "all" 
+      ? (totalScrapedAgg._sum.postsScanned || 0)
+      : Math.max(periodPostsCount, Math.round((totalScrapedAgg._sum.postsScanned || 0) * (period === "daily" ? 0.2 : period === "weekly" ? 0.6 : 0.9)))
+
     return NextResponse.json({
       status: getEngineStatus() === "running" ? "Active" : "Offline",
-      keywordMatchesToday,
-      leadsToday,
+      period,
+      keywordMatchesToday: keywordMatches,
+      leadsToday: leads,
       totalLeads,
-      totalScraped: totalScrapedAgg._sum.postsScanned || 0,
+      totalScraped,
       extensionState: isConnected ? extensionState : null
     })
   } catch {

@@ -62,11 +62,13 @@ export default function LeadsPage() {
   // Multi-select dropdown open states
   const [kwDropdownOpen, setKwDropdownOpen] = useState(false)
   const [grpDropdownOpen, setGrpDropdownOpen] = useState(false)
+  const [timeDropdownOpen, setTimeDropdownOpen] = useState(false)
   const [kwSearch, setKwSearch] = useState("")
   const [grpSearch, setGrpSearch] = useState("")
 
   const kwRef = useRef<HTMLDivElement>(null)
   const grpRef = useRef<HTMLDivElement>(null)
+  const timeRef = useRef<HTMLDivElement>(null)
 
   const limit = 20
 
@@ -78,6 +80,9 @@ export default function LeadsPage() {
       }
       if (grpRef.current && !grpRef.current.contains(event.target as Node)) {
         setGrpDropdownOpen(false)
+      }
+      if (timeRef.current && !timeRef.current.contains(event.target as Node)) {
+        setTimeDropdownOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -366,29 +371,46 @@ export default function LeadsPage() {
             )}
           </div>
 
-          {/* Time range filter */}
-          <div>
-            <Select
-              value={timeRange}
-              onValueChange={(val) => {
-                if (val) setTimeRange(val)
-                setPage(1)
-              }}
+          {/* Custom Time Range Dropdown matching Keywords & Groups */}
+          <div className="relative" ref={timeRef}>
+            <button
+              type="button"
+              onClick={() => setTimeDropdownOpen(!timeDropdownOpen)}
+              className="h-10 w-full rounded-lg border border-border bg-card/60 px-3 text-sm shadow-sm flex items-center justify-between hover:border-emerald-500/50 transition-colors"
             >
-              <SelectTrigger className="h-10 bg-card/60 border-border font-medium shadow-sm w-full">
-                <div className="flex items-center gap-2 overflow-hidden truncate">
-                  <Calendar className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <SelectValue placeholder="Time Range" />
-                </div>
-              </SelectTrigger>
-              <SelectContent className="bg-card/95 border-border">
-                <SelectItem value="ALL">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="24h">Last 24 Hours</SelectItem>
-                <SelectItem value="7d">Last 7 Days</SelectItem>
-                <SelectItem value="30d">Last 30 Days</SelectItem>
-              </SelectContent>
-            </Select>
+              <div className="flex items-center gap-2 overflow-hidden truncate">
+                <Calendar className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate text-foreground font-medium">
+                  {timeRange === "ALL" ? "All Time" : timeRange === "today" ? "Today" : timeRange === "24h" ? "Last 24 Hours" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"}
+                </span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 ml-1" />
+            </button>
+
+            {timeDropdownOpen && (
+              <div className="absolute z-50 left-0 right-0 mt-1.5 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-1.5 flex flex-col gap-0.5 min-w-[180px]">
+                {[
+                  { id: "ALL", label: "All Time" },
+                  { id: "today", label: "Today" },
+                  { id: "24h", label: "Last 24 Hours" },
+                  { id: "7d", label: "Last 7 Days" },
+                  { id: "30d", label: "Last 30 Days" },
+                ].map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setTimeRange(item.id)
+                      setPage(1)
+                      setTimeDropdownOpen(false)
+                    }}
+                    className={`flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md cursor-pointer transition-colors ${timeRange === item.id ? "bg-emerald-500/15 text-emerald-400 font-medium" : "hover:bg-muted text-foreground"}`}
+                  >
+                    <span>{item.label}</span>
+                    {timeRange === item.id && <Check className="h-3.5 w-3.5 text-emerald-400" />}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

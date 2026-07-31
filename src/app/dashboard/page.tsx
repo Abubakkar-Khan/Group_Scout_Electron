@@ -43,12 +43,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedPost, setSelectedPost] = useState<Lead | null>(null)
 
+  const [statsPeriod, setStatsPeriod] = useState<"daily" | "weekly" | "monthly" | "all">("daily")
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [leadsRes, statsRes] = await Promise.all([
-          fetch("/api/posts?relevant=true&limit=20"), // Fetch recent leads
-          fetch("/api/stats")
+          fetch("/api/posts?relevant=true&limit=20"),
+          fetch(`/api/stats?period=${statsPeriod}`)
         ])
         if (leadsRes.ok) {
           const data = await leadsRes.json()
@@ -63,61 +65,78 @@ export default function DashboardPage() {
     }
     
     fetchData()
-    const interval = setInterval(fetchData, 30000) // Poll every 30s
+    const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [statsPeriod])
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Overview</h1>
           <p className="text-muted-foreground mt-1">Monitor your high-intent Facebook Group leads.</p>
         </div>
         
-        <div className="flex items-center gap-6 bg-card/50 backdrop-blur-sm border border-border/50 px-5 py-3 rounded-xl shadow-sm">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Engine Status</span>
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                {stats.status === "Active" ? (
-                  <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </>
-                ) : (
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-muted"></span>
-                )}
-              </span>
-              <span className="text-sm font-bold">
-                {stats.status === "Active" ? "Connected" : "Offline / Paused"}
-              </span>
-            </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Period Selector */}
+          <div className="flex items-center gap-1 bg-card/60 p-1 rounded-xl border border-border">
+            {(["daily", "weekly", "monthly", "all"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setStatsPeriod(p)}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize transition-all ${
+                  statsPeriod === p 
+                    ? "bg-emerald-500 text-slate-950 shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p === "all" ? "All Time" : p}
+              </button>
+            ))}
           </div>
-          
-          <div className="h-8 w-px bg-border/50"></div>
-          
-          <Button 
-            variant={stats.status === "Active" ? "destructive" : "default"} 
-            size="sm"
-            onClick={async () => {
-              const action = stats.status === "Active" ? "stop" : "start"
-              // Optimistic update
-              setStats(s => ({ ...s, status: action === "start" ? "Active" : "Offline" }))
-              try {
-                await fetch("/api/engine", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ action })
-                })
-              } catch (e) {
-                console.error("Failed to toggle engine", e)
-              }
-            }}
-          >
-            {stats.status === "Active" ? "Stop Engine" : "Start Engine"}
-          </Button>
 
+          <div className="flex items-center gap-6 bg-card/50 backdrop-blur-sm border border-border/50 px-5 py-2.5 rounded-xl shadow-sm">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-0.5">Engine Status</span>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  {stats.status === "Active" ? (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </>
+                  ) : (
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-muted"></span>
+                  )}
+                </span>
+                <span className="text-sm font-bold">
+                  {stats.status === "Active" ? "Connected" : "Offline / Paused"}
+                </span>
+              </div>
+            </div>
+            
+            <div className="h-8 w-px bg-border/50"></div>
+            
+            <Button 
+              variant={stats.status === "Active" ? "destructive" : "default"} 
+              size="sm"
+              onClick={async () => {
+                const action = stats.status === "Active" ? "stop" : "start"
+                setStats(s => ({ ...s, status: action === "start" ? "Active" : "Offline" }))
+                try {
+                  await fetch("/api/engine", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action })
+                  })
+                } catch (e) {
+                  console.error("Failed to toggle engine", e)
+                }
+              }}
+            >
+              {stats.status === "Active" ? "Stop Engine" : "Start Engine"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -125,26 +144,26 @@ export default function DashboardPage() {
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Posts Scanned</CardTitle>
-            <Activity className="size-4 text-muted-foreground" />
+            <Activity className="size-4 text-emerald-400" />
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-8 w-16" /> : (
               <div className="text-2xl font-bold">{stats.totalScraped.toLocaleString()}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">Raw posts read from Facebook</p>
+            <p className="text-xs text-muted-foreground mt-1 capitalize">{statsPeriod === "all" ? "All-time raw posts scanned" : `Raw posts scanned (${statsPeriod})`}</p>
           </CardContent>
         </Card>
 
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Keyword Matches</CardTitle>
-            <Users className="size-4 text-muted-foreground" />
+            <Users className="size-4 text-emerald-400" />
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-8 w-16" /> : (
               <div className="text-2xl font-bold">{stats.keywordMatchesToday.toLocaleString()}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">Raw posts matched today</p>
+            <p className="text-xs text-muted-foreground mt-1 capitalize">Keyword matches ({statsPeriod})</p>
           </CardContent>
         </Card>
         
@@ -157,7 +176,7 @@ export default function DashboardPage() {
             {loading ? <Skeleton className="h-8 w-16" /> : (
               <div className="text-2xl font-bold text-emerald-500">{stats.leadsToday.toLocaleString()}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">AI-approved leads today (Total: {stats.totalLeads})</p>
+            <p className="text-xs text-muted-foreground mt-1">Target leads ({statsPeriod === "all" ? "All Time" : statsPeriod}) (Total: {stats.totalLeads})</p>
           </CardContent>
         </Card>
       </div>
