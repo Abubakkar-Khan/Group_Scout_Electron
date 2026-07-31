@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { RefreshCw, Terminal, Trash2, Search, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
 interface LogEvent {
   id: string
   type: string
@@ -103,21 +105,20 @@ export default function DebugPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="relative w-full sm:w-48">
-          <Filter className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <select 
-            className="h-9 w-full appearance-none rounded-md border border-input bg-transparent pl-9 pr-8 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            value={logTypeFilter}
-            onChange={(e) => setLogTypeFilter(e.target.value)}
-          >
-            <option value="ALL">All Levels</option>
-            <option value="INFO">Info</option>
-            <option value="ERROR">Error</option>
-            <option value="WARN">Warning</option>
-            <option value="SUCCESS">Success</option>
-            <option value="STATE_SYNC">State Sync</option>
-          </select>
-          <div className="pointer-events-none absolute right-3 top-[14px] h-[5px] w-[5px] border-l-[1.5px] border-b-[1.5px] border-muted-foreground -rotate-45 transform"></div>
+        <div className="w-full sm:w-48">
+          <Select value={logTypeFilter} onValueChange={(v) => v && setLogTypeFilter(v)}>
+            <SelectTrigger className="bg-card/60 border-border text-sm h-9 focus:ring-1 focus:ring-emerald-500">
+              <SelectValue placeholder="All Levels" />
+            </SelectTrigger>
+            <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl">
+              <SelectItem value="ALL">All Levels</SelectItem>
+              <SelectItem value="INFO">Info</SelectItem>
+              <SelectItem value="ERROR">Error</SelectItem>
+              <SelectItem value="WARN">Warning</SelectItem>
+              <SelectItem value="SUCCESS">Success</SelectItem>
+              <SelectItem value="STATE_SYNC">State Sync</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
