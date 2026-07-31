@@ -242,7 +242,7 @@ export default function DashboardPage() {
                       {lead.viewed ? (
                         <Badge variant="outline" className="text-muted-foreground border-border">Viewed</Badge>
                       ) : (
-                        <Badge className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:from-indigo-600 hover:to-purple-600 border-none shadow-sm shadow-indigo-500/20 font-medium">New</Badge>
+                        <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 border-none shadow-sm shadow-emerald-500/20 font-medium">New</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">

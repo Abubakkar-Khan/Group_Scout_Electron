@@ -13,8 +13,8 @@ export async function GET(request: Request) {
   const relevantParam = searchParams.get("relevant")
   const viewedParam = searchParams.get("viewed")
   const searchParam = searchParams.get("search")
-  const keywordParam = searchParams.get("keyword")
-  const groupIdParam = searchParams.get("groupId")
+  const keywordsParam = searchParams.get("keywords") || searchParams.get("keyword")
+  const groupIdsParam = searchParams.get("groupIds") || searchParams.get("groupId")
   const timeRangeParam = searchParams.get("timeRange")
   
   const whereClause: Prisma.PostWhereInput = { userId: session.user.id }
@@ -23,8 +23,23 @@ export async function GET(request: Request) {
   if (viewedParam === "true") whereClause.viewed = true
   if (viewedParam === "false") whereClause.viewed = false
   
-  if (keywordParam && keywordParam !== "ALL") whereClause.keyword = keywordParam
-  if (groupIdParam && groupIdParam !== "ALL") whereClause.groupId = groupIdParam
+  if (keywordsParam && keywordsParam !== "ALL") {
+    const list = keywordsParam.split(",").map(s => s.trim()).filter(Boolean)
+    if (list.length === 1) {
+      whereClause.keyword = list[0]
+    } else if (list.length > 1) {
+      whereClause.keyword = { in: list }
+    }
+  }
+
+  if (groupIdsParam && groupIdsParam !== "ALL") {
+    const list = groupIdsParam.split(",").map(s => s.trim()).filter(Boolean)
+    if (list.length === 1) {
+      whereClause.groupId = list[0]
+    } else if (list.length > 1) {
+      whereClause.groupId = { in: list }
+    }
+  }
 
   if (timeRangeParam && timeRangeParam !== "ALL") {
     let startDate: Date | null = null
