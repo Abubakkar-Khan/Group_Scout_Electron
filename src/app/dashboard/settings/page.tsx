@@ -248,14 +248,14 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold text-foreground">Scrolling Speed</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Select value={settings.scrollSpeed} onValueChange={(v) => v && setSettings({ ...settings, scrollSpeed: v })}>
-                    <SelectTrigger className="bg-background/50 border-border text-sm h-10">
+                    <SelectTrigger className="bg-card/60 border-border text-sm h-10 focus:ring-1 focus:ring-emerald-500">
                       <SelectValue placeholder="Select speed" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card/95 border-border">
-                      <SelectItem value="fast">⚡ Fast (Quick scrolls, 150ms delays)</SelectItem>
-                      <SelectItem value="medium">⚡ Medium (Balanced - Recommended)</SelectItem>
-                      <SelectItem value="slow">🐢 Stealth / Slow (Human reading pace)</SelectItem>
-                      <SelectItem value="human">👤 Human Mimic (Variable micro-pauses)</SelectItem>
+                    <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl">
+                      <SelectItem value="fast">Fast (Quick scrolls, 150ms delays)</SelectItem>
+                      <SelectItem value="medium">Medium (Balanced - Recommended)</SelectItem>
+                      <SelectItem value="slow">Stealth / Slow (Human reading pace)</SelectItem>
+                      <SelectItem value="human">Human Mimic (Variable micro-pauses)</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -266,10 +266,10 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold text-foreground">Pause Between Groups</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Select value={settings.interGroupDelaySeconds} onValueChange={(v) => v && setSettings({ ...settings, interGroupDelaySeconds: v })}>
-                    <SelectTrigger className="bg-background/50 border-border text-sm h-10">
+                    <SelectTrigger className="bg-card/60 border-border text-sm h-10 focus:ring-1 focus:ring-emerald-500">
                       <SelectValue placeholder="Select pause" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card/95 border-border">
+                    <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl">
                       <SelectItem value="1">1 second (Instant transition)</SelectItem>
                       <SelectItem value="3">3 seconds (Recommended)</SelectItem>
                       <SelectItem value="5">5 seconds (Relaxed)</SelectItem>
@@ -286,10 +286,10 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold text-foreground">Scan Interval (Background Cycle)</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Select value={settings.scanInterval} onValueChange={(v) => v && setSettings({ ...settings, scanInterval: v })}>
-                    <SelectTrigger className="bg-background/50 border-border text-sm h-10">
+                    <SelectTrigger className="bg-card/60 border-border text-sm h-10 focus:ring-1 focus:ring-emerald-500">
                       <SelectValue placeholder="Select interval" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card/95 border-border">
+                    <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl">
                       <SelectItem value="1">Every 1 minute</SelectItem>
                       <SelectItem value="2">Every 2 minutes</SelectItem>
                       <SelectItem value="5">Every 5 minutes (Default)</SelectItem>
@@ -334,10 +334,10 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold text-foreground">Active Start Time (From)</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Select value={settings.activeFrom} onValueChange={(v) => v && setSettings({ ...settings, activeFrom: v })}>
-                    <SelectTrigger className="bg-background/50 border-border text-sm h-10">
+                    <SelectTrigger className="bg-card/60 border-border text-sm h-10 focus:ring-1 focus:ring-emerald-500">
                       <SelectValue placeholder="Start time" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card/95 border-border max-h-56">
+                    <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl max-h-56">
                       {HOURS_OPTIONS.map((h) => (
                         <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>
                       ))}
@@ -350,10 +350,10 @@ export default function SettingsPage() {
                 <Label className="text-xs font-semibold text-foreground">Active End Time (To)</Label>
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Select value={settings.activeTo} onValueChange={(v) => v && setSettings({ ...settings, activeTo: v })}>
-                    <SelectTrigger className="bg-background/50 border-border text-sm h-10">
+                    <SelectTrigger className="bg-card/60 border-border text-sm h-10 focus:ring-1 focus:ring-emerald-500">
                       <SelectValue placeholder="End time" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card/95 border-border max-h-56">
+                    <SelectContent className="bg-card/95 border-border backdrop-blur-xl shadow-xl max-h-56">
                       {HOURS_OPTIONS.map((h) => (
                         <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>
                       ))}
