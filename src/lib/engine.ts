@@ -9,7 +9,7 @@ const automator = new FacebookAutomator();
 let isRunning = false;
 
 /** Log event helper to write persistent events to the database for UI display */
-async function logEngineEvent(userId: string, type: "INFO" | "WARN" | "ERROR" | "SUCCESS", message: string, metadata?: any) {
+async function logEngineEvent(userId: string, type: "INFO" | "WARN" | "ERROR" | "SUCCESS" | "SCAN_STATS", message: string, metadata?: any) {
   console.log(`[Engine:${type}] ${message}`);
   try {
     await prisma.logEvent.create({
