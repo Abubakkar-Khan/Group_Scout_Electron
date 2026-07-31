@@ -166,6 +166,14 @@ export default function SettingsPage() {
     }
   }
 
+  const formatTimeInput = (raw: string) => {
+    // Strip all non-digit characters and cap at 4 digits (HHMM)
+    const digits = raw.replace(/\D/g, "").slice(0, 4)
+    if (digits.length === 0) return ""
+    if (digits.length <= 2) return digits
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -310,7 +318,7 @@ export default function SettingsPage() {
                     max="20"
                     value={settings.autoScrollPages} 
                     onChange={(e) => setSettings({ ...settings, autoScrollPages: e.target.value })}
-                    className="bg-background/50 border-border text-sm h-10" 
+                    className="bg-card/60 border-border text-sm h-10" 
                   />
                 )}
                 <p className="text-[11px] text-muted-foreground">Number of feed page scrolls per group visit (e.g., 5 pages ≈ 50 posts).</p>
@@ -326,7 +334,7 @@ export default function SettingsPage() {
               <Clock className="size-5 text-muted-foreground" />
               <CardTitle className="text-lg">Operating Schedule & Active Hours</CardTitle>
             </div>
-            <CardDescription className="text-xs text-muted-foreground">Type custom start and end times in 24-hour format (e.g. 08:30 to 20:15) or click a quick preset.</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">Type custom start and end times in 24-hour format (e.g. 0830 -> 08:30) or click a quick preset.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-1">
             <div className="grid gap-5 md:grid-cols-2">
@@ -335,13 +343,14 @@ export default function SettingsPage() {
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Input
                     type="text"
+                    maxLength={5}
                     placeholder="00:00"
                     value={settings.activeFrom}
-                    onChange={(e) => setSettings({ ...settings, activeFrom: e.target.value })}
+                    onChange={(e) => setSettings({ ...settings, activeFrom: formatTimeInput(e.target.value) })}
                     className="bg-card/60 border-border text-foreground font-mono text-sm h-10 px-3.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
                 )}
-                <p className="text-[11px] text-muted-foreground">Type start time in 24h format (e.g. 08:00 or 00:00).</p>
+                <p className="text-[11px] text-muted-foreground">Numbers only (e.g. type 0800 for 08:00).</p>
               </div>
 
               <div className="space-y-2">
@@ -349,15 +358,16 @@ export default function SettingsPage() {
                 {loading ? <Skeleton className="h-10 w-full" /> : (
                   <Input
                     type="text"
+                    maxLength={5}
                     placeholder="23:59"
                     value={settings.activeTo}
-                    onChange={(e) => setSettings({ ...settings, activeTo: e.target.value })}
+                    onChange={(e) => setSettings({ ...settings, activeTo: formatTimeInput(e.target.value) })}
                     className="bg-card/60 border-border text-foreground font-mono text-sm h-10 px-3.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
                 )}
-                <p className="text-[11px] text-muted-foreground">Type end time in 24h format (e.g. 20:00 or 23:59).</p>
+                <p className="text-[11px] text-muted-foreground">Numbers only (e.g. type 2000 for 20:00).</p>
               </div>
-            </div>
+            </div>v>
 
             {/* Quick Presets */}
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/40">
