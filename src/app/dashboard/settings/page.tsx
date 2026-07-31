@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Save, Gauge, Clock, ShieldCheck, Trash2, Cpu, Lock, CheckCircle2, AlertCircle } from "lucide-react"
 
+import { TimeSetter } from "@/components/ui/time-setter"
+
 type SettingsForm = {
   userId: string
   scanInterval: string
@@ -334,38 +336,30 @@ export default function SettingsPage() {
               <Clock className="size-5 text-muted-foreground" />
               <CardTitle className="text-lg">Operating Schedule & Active Hours</CardTitle>
             </div>
-            <CardDescription className="text-xs text-muted-foreground">Type custom start and end times in 24-hour format (e.g. 0830 to 08:30) or click a quick preset.</CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">Adjust digital time controls or click a quick preset schedule.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-1">
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground">Active Start Time (HH:MM)</Label>
-                {loading ? <Skeleton className="h-10 w-full" /> : (
-                  <Input
-                    type="text"
-                    maxLength={5}
-                    placeholder="00:00"
+                <Label className="text-xs font-semibold text-foreground">Active Start Time</Label>
+                {loading ? <Skeleton className="h-14 w-full rounded-xl" /> : (
+                  <TimeSetter
                     value={settings.activeFrom}
-                    onChange={(e) => setSettings({ ...settings, activeFrom: formatTimeInput(e.target.value) })}
-                    className="bg-card/60 border-border text-foreground font-mono text-sm h-10 px-3.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                    onChange={(val) => setSettings({ ...settings, activeFrom: val })}
                   />
                 )}
-                <p className="text-[11px] text-muted-foreground">Numbers only (e.g. type 0800 for 08:00).</p>
+                <p className="text-[11px] text-muted-foreground">Use arrows or click digits to adjust hours and minutes.</p>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground">Active End Time (HH:MM)</Label>
-                {loading ? <Skeleton className="h-10 w-full" /> : (
-                  <Input
-                    type="text"
-                    maxLength={5}
-                    placeholder="23:59"
+                <Label className="text-xs font-semibold text-foreground">Active End Time</Label>
+                {loading ? <Skeleton className="h-14 w-full rounded-xl" /> : (
+                  <TimeSetter
                     value={settings.activeTo}
-                    onChange={(e) => setSettings({ ...settings, activeTo: formatTimeInput(e.target.value) })}
-                    className="bg-card/60 border-border text-foreground font-mono text-sm h-10 px-3.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                    onChange={(val) => setSettings({ ...settings, activeTo: val })}
                   />
                 )}
-                <p className="text-[11px] text-muted-foreground">Numbers only (e.g. type 2000 for 20:00).</p>
+                <p className="text-[11px] text-muted-foreground">Use arrows or click digits to adjust hours and minutes.</p>
               </div>
             </div>
 
