@@ -112,34 +112,62 @@ export default function LeadsPage() {
     fetchOptions()
   }, [])
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        
-        let url = `/api/posts?relevant=true&limit=${limit}&page=${page}`
-        if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
-        if (filter === "NEW") url += `&viewed=false`
-        if (filter === "VIEWED") url += `&viewed=true`
-        if (selectedKeywords.length > 0) url += `&keywords=${encodeURIComponent(selectedKeywords.join(","))}`
-        if (selectedGroups.length > 0) url += `&groupIds=${encodeURIComponent(selectedGroups.join(","))}`
-        if (timeRange !== "ALL") url += `&timeRange=${encodeURIComponent(timeRange)}`
+  const lastLeadIdRef = useRef<string | null>(null)
 
-        const res = await fetch(url)
-        if (res.ok) {
-          const data = await res.json()
-          setLeads(data.posts || [])
-          setTotalCount(data.totalCount || 0)
+  const fetchData = async (isSilent = false) => {
+    try {
+      if (!isSilent) setLoading(true)
+      
+      let url = `/api/posts?relevant=true&limit=${limit}&page=${page}`
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
+      if (filter === "NEW") url += `&viewed=false`
+      if (filter === "VIEWED") url += `&viewed=true`
+      if (selectedKeywords.length > 0) url += `&keywords=${encodeURIComponent(selectedKeywords.join(","))}`
+      if (selectedGroups.length > 0) url += `&groupIds=${encodeURIComponent(selectedGroups.join(","))}`
+      if (timeRange !== "ALL") url += `&timeRange=${encodeURIComponent(timeRange)}`
+
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        const fetchedPosts: Lead[] = data.posts || []
+        const newTotal: number = data.totalCount || 0
+
+        if (isSilent && fetchedPosts.length > 0) {
+          const latestId = fetchedPosts[0].id
+          if (lastLeadIdRef.current && latestId !== lastLeadIdRef.current) {
+            toast.success("New lead captured!", {
+              description: `Keyword matched: "${fetchedPosts[0].keyword}" in ${fetchedPosts[0].group?.name || "Facebook Group"}`
+            })
+          }
+          lastLeadIdRef.current = latestId
+        } else if (fetchedPosts.length > 0) {
+          lastLeadIdRef.current = fetchedPosts[0].id
         }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
+
+        setLeads(fetchedPosts)
+        setTotalCount(newTotal)
       }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      if (!isSilent) setLoading(false)
     }
-    
-    const timeout = setTimeout(fetchData, 300)
-    return () => clearTimeout(timeout)
+  }
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      fetchData(false)
+    }, 300)
+
+    // 5-second silent auto-polling for real-time lead updates without page refresh
+    const interval = setInterval(() => {
+      fetchData(true)
+    }, 5000)
+
+    return () => {
+      clearTimeout(timeout)
+      clearInterval(interval)
+    }
   }, [page, searchQuery, filter, selectedKeywords, selectedGroups, timeRange])
 
   const toggleKeyword = (kwName: string) => {
