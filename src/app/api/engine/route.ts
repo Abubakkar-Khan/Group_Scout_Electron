@@ -31,8 +31,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, status: "login_opened" });
     } else if (action === "check_session") {
       const fs = await import("fs");
-      const path = await import("path");
-      const userDataDir = path.join(process.cwd(), "chrome-data");
+      const { getChromeDataDir } = await import("@/lib/paths");
+      const userDataDir = getChromeDataDir();
       const sessionExists = fs.existsSync(userDataDir) && fs.readdirSync(userDataDir).length > 2;
       return NextResponse.json({ 
         sessionExists, 

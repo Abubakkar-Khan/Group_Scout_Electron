@@ -90,6 +90,30 @@ async function startNextServer(port: number): Promise<void> {
   const rawAppPath = app.getAppPath();
   const unpackedPath = rawAppPath.replace("app.asar", "app.asar.unpacked");
 
+  // Ensure user data directory exists for SQLite database storage
+  const userDataPath = app.getPath("userData");
+  if (!fs.existsSync(userDataPath)) {
+    try { fs.mkdirSync(userDataPath, { recursive: true }); } catch {}
+  }
+
+  const dbPath = path.join(userDataPath, "database.db");
+  const unpackedDbPath = path.join(unpackedPath, "prisma", "dev.db");
+  const rawDbPath = path.join(rawAppPath, "prisma", "dev.db");
+
+  if (!fs.existsSync(dbPath)) {
+    try {
+      if (fs.existsSync(unpackedDbPath)) {
+        fs.copyFileSync(unpackedDbPath, dbPath);
+      } else if (fs.existsSync(rawDbPath)) {
+        fs.copyFileSync(rawDbPath, dbPath);
+      }
+    } catch (e) {
+      console.error("Failed to initialize production SQLite database file:", e);
+    }
+  }
+
+  const dbUrl = `file:${dbPath.replace(/\\/g, "/")}`;
+
   const nextBinInAsar = path.join(rawAppPath, "node_modules", "next", "dist", "bin", "next");
   const nextBinUnpacked = path.join(unpackedPath, "node_modules", "next", "dist", "bin", "next");
 
@@ -100,6 +124,7 @@ async function startNextServer(port: number): Promise<void> {
     ...process.env,
     PORT: port.toString(),
     NEXT_PUBLIC_APP_URL: `http://localhost:${port}`,
+    DATABASE_URL: dbUrl,
     ELECTRON_RUN_AS_NODE: "1",
   };
 

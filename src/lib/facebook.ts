@@ -2,8 +2,10 @@ import { chromium, BrowserContext, Page, Response } from "playwright";
 import fs from "fs";
 import path from "path";
 
+import { getChromeDataDir } from "@/lib/paths";
+
 const CHROME_PATH = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const USER_DATA_DIR = path.join(process.cwd(), "chrome-data");
+const USER_DATA_DIR = getChromeDataDir();
 
 export interface FacebookPost {
   postId: string;
