@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from "electron";
 import path from "path";
+import fs from "fs";
 import http from "http";
 import net from "net";
 import { spawn, fork, ChildProcess } from "child_process";
@@ -86,19 +87,26 @@ async function startNextServer(port: number): Promise<void> {
     return;
   }
 
-  const appPath = app.getAppPath();
-  const nextBin = path.join(appPath, "node_modules", "next", "dist", "bin", "next");
+  const rawAppPath = app.getAppPath();
+  const unpackedPath = rawAppPath.replace("app.asar", "app.asar.unpacked");
+
+  const nextBinInAsar = path.join(rawAppPath, "node_modules", "next", "dist", "bin", "next");
+  const nextBinUnpacked = path.join(unpackedPath, "node_modules", "next", "dist", "bin", "next");
+
+  const nextBin = fs.existsSync(nextBinUnpacked) ? nextBinUnpacked : nextBinInAsar;
+  const workingDir = fs.existsSync(unpackedPath) ? unpackedPath : rawAppPath;
 
   const serverEnv = {
     ...process.env,
     PORT: port.toString(),
     NEXT_PUBLIC_APP_URL: `http://localhost:${port}`,
+    ELECTRON_RUN_AS_NODE: "1",
   };
 
-  // child_process.fork uses Node's module loader which natively reads inside app.asar
   serverProcess = fork(nextBin, ["start", "-p", port.toString()], {
-    cwd: appPath,
+    cwd: workingDir,
     env: serverEnv,
+    execPath: process.execPath,
     stdio: "inherit",
   });
 
@@ -119,7 +127,7 @@ async function startNextServer(port: number): Promise<void> {
  * Create or return application icon
  */
 function getAppIcon(): Electron.NativeImage {
-  const iconPath = path.join(app.getAppPath(), "public", "icon.png");
+  const iconPath = path.join(app.getAppPath(), "public", "icon.ico");
   try {
     const img = nativeImage.createFromPath(iconPath);
     if (!img.isEmpty()) return img;
