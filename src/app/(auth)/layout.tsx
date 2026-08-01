@@ -13,7 +13,7 @@ export default function AuthLayout({
       <div className="w-full max-w-md p-6 relative z-10">
         <div className="flex justify-center mb-8">
           <Link href="/" className="font-semibold text-2xl tracking-tight flex items-center gap-2.5 text-foreground">
-            <img src="/gs.webp" alt="GroupScout" className="size-9 rounded-xl object-contain" />
+            <img src="/gs-logo.webp" alt="GroupScout" className="size-9 rounded-xl object-contain" />
             <span className="font-bold">GroupScout</span>
           </Link>
         </div>

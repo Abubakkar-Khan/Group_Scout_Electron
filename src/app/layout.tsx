@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   title: "GroupScout | High-Intent Facebook Leads",
   description: "Monitor Facebook Groups for high-intent leads.",
   icons: {
-    icon: "/gs.webp",
-    shortcut: "/gs.webp",
-    apple: "/gs.webp",
+    icon: "/gs-icon.webp",
+    shortcut: "/gs-icon.webp",
+    apple: "/gs-logo.webp",
   }
 };
 

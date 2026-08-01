@@ -37,13 +37,13 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: 
       <div className="flex h-14 items-center justify-between px-4 border-b border-border shrink-0">
         {!collapsed && (
           <Link href="/dashboard" className="font-semibold tracking-tight flex items-center gap-2 text-foreground">
-            <img src="/gs.webp" alt="GroupScout" className="size-7 rounded-lg object-contain" />
+            <img src="/gs-icon.webp" alt="GroupScout" className="size-7 rounded-lg object-contain" />
             <span className="text-base font-bold">GroupScout</span>
           </Link>
         )}
         {collapsed && (
           <Link href="/dashboard" className="mx-auto">
-            <img src="/gs.webp" alt="GroupScout" className="size-7 rounded-lg object-contain" />
+            <img src="/gs-icon.webp" alt="GroupScout" className="size-7 rounded-lg object-contain" />
           </Link>
         )}
       </div>
