@@ -127,14 +127,25 @@ async function startNextServer(port: number): Promise<void> {
  * Create or return application icon
  */
 function getAppIcon(): Electron.NativeImage {
-  const iconPath = path.join(app.getAppPath(), "public", "icon.ico");
-  try {
-    const img = nativeImage.createFromPath(iconPath);
-    if (!img.isEmpty()) return img;
-  } catch (e) {
-    // Fallback if image fails to load
+  const rawAppPath = app.getAppPath();
+  const unpackedPath = rawAppPath.replace("app.asar", "app.asar.unpacked");
+
+  const candidatePaths = [
+    path.join(rawAppPath, "public", "icon.png"),
+    path.join(unpackedPath, "public", "icon.png"),
+    path.join(__dirname, "..", "public", "icon.png"),
+    path.join(rawAppPath, "public", "gs-icon.webp"),
+  ];
+
+  for (const iconPath of candidatePaths) {
+    try {
+      if (fs.existsSync(iconPath)) {
+        const img = nativeImage.createFromPath(iconPath);
+        if (!img.isEmpty()) return img;
+      }
+    } catch {}
   }
-  // Fallback to empty nativeImage
+
   return nativeImage.createEmpty();
 }
 
