@@ -3,11 +3,17 @@ import path from "path";
 import fs from "fs";
 import http from "http";
 import net from "net";
-import { spawn, fork, ChildProcess } from "child_process";
+import { fork, ChildProcess } from "child_process";
 import dotenv from "dotenv";
 
 // Load environment variables from .env file if available
-dotenv.config({ path: path.join(app.getAppPath(), ".env") });
+const envPaths = [
+  path.join(app.getAppPath(), ".env"),
+  path.join(app.getAppPath().replace("app.asar", "app.asar.unpacked"), ".env"),
+];
+for (const p of envPaths) {
+  if (fs.existsSync(p)) { dotenv.config({ path: p }); break; }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -48,9 +54,9 @@ function findAvailablePort(startPort: number): Promise<number> {
 }
 
 /**
- * Wait for Next.js HTTP server to respond with HTTP 200
+ * Wait for HTTP server to respond
  */
-function waitForServer(port: number, timeoutMs = 45000): Promise<void> {
+function waitForServer(port: number, timeoutMs = 60000): Promise<void> {
   const startTime = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
@@ -70,7 +76,7 @@ function waitForServer(port: number, timeoutMs = 45000): Promise<void> {
       if (Date.now() - startTime > timeoutMs) {
         reject(new Error(`Timeout waiting for Next.js server on port ${port}`));
       } else {
-        setTimeout(check, 250);
+        setTimeout(check, 500);
       }
     };
 
@@ -79,73 +85,136 @@ function waitForServer(port: number, timeoutMs = 45000): Promise<void> {
 }
 
 /**
- * Start the Next.js production server using Node's internal module loader
+ * Start the Next.js standalone production server
  */
 async function startNextServer(port: number): Promise<void> {
-  if (isDev) {
-    // In dev mode, 'next dev' is already started by concurrently script
-    return;
-  }
+  if (isDev) return;
 
   const rawAppPath = app.getAppPath();
-  const unpackedPath = rawAppPath.replace("app.asar", "app.asar.unpacked");
+  const unpackedBase = rawAppPath.replace("app.asar", "app.asar.unpacked");
 
-  // Ensure user data directory exists for SQLite database storage
+  // --- Database setup: copy seed db to writable %APPDATA% ---
   const userDataPath = app.getPath("userData");
   if (!fs.existsSync(userDataPath)) {
     try { fs.mkdirSync(userDataPath, { recursive: true }); } catch {}
   }
 
   const dbPath = path.join(userDataPath, "database.db");
-  const unpackedDbPath = path.join(unpackedPath, "prisma", "dev.db");
-  const rawDbPath = path.join(rawAppPath, "prisma", "dev.db");
-
   if (!fs.existsSync(dbPath)) {
-    try {
-      if (fs.existsSync(unpackedDbPath)) {
-        fs.copyFileSync(unpackedDbPath, dbPath);
-      } else if (fs.existsSync(rawDbPath)) {
-        fs.copyFileSync(rawDbPath, dbPath);
+    // Try to copy the seed database shipped with the app
+    for (const base of [unpackedBase, rawAppPath]) {
+      const src = path.join(base, "prisma", "dev.db");
+      if (fs.existsSync(src)) {
+        try { fs.copyFileSync(src, dbPath); } catch {}
+        break;
       }
-    } catch (e) {
-      console.error("Failed to initialize production SQLite database file:", e);
+    }
+  }
+  const dbUrl = `file:${dbPath.replace(/\\/g, "/")}`;
+
+  // --- Find standalone server.js ---
+  // Next.js standalone output places server.js at .next/standalone/server.js
+  const standaloneServerPaths = [
+    path.join(unpackedBase, ".next", "standalone", "server.js"),
+    path.join(rawAppPath, ".next", "standalone", "server.js"),
+  ];
+
+  let serverJs = "";
+  for (const p of standaloneServerPaths) {
+    if (fs.existsSync(p)) { serverJs = p; break; }
+  }
+
+  if (!serverJs) {
+    const msg = `Could not find standalone server.js.\nSearched:\n${standaloneServerPaths.join("\n")}`;
+    console.error(msg);
+    dialog.showErrorBox("GroupScout Server Error", msg);
+    return;
+  }
+
+  // The standalone server needs the static files. In standalone mode,
+  // Next.js expects them at <standalone>/.next/static and <standalone>/public.
+  // We copy them from the unpacked/asar paths if they don't exist in standalone dir.
+  const standaloneDir = path.dirname(serverJs);
+  const standaloneStaticDir = path.join(standaloneDir, ".next", "static");
+  const standalonePublicDir = path.join(standaloneDir, "public");
+
+  // Copy .next/static if missing from standalone
+  if (!fs.existsSync(standaloneStaticDir)) {
+    for (const base of [unpackedBase, rawAppPath]) {
+      const src = path.join(base, ".next", "static");
+      if (fs.existsSync(src)) {
+        try { copyDirSync(src, standaloneStaticDir); } catch {}
+        break;
+      }
     }
   }
 
-  const dbUrl = `file:${dbPath.replace(/\\/g, "/")}`;
-
-  const nextBinInAsar = path.join(rawAppPath, "node_modules", "next", "dist", "bin", "next");
-  const nextBinUnpacked = path.join(unpackedPath, "node_modules", "next", "dist", "bin", "next");
-
-  const nextBin = fs.existsSync(nextBinUnpacked) ? nextBinUnpacked : nextBinInAsar;
-  const workingDir = fs.existsSync(unpackedPath) ? unpackedPath : rawAppPath;
+  // Copy public/ if missing from standalone
+  if (!fs.existsSync(standalonePublicDir)) {
+    for (const base of [unpackedBase, rawAppPath]) {
+      const src = path.join(base, "public");
+      if (fs.existsSync(src)) {
+        try { copyDirSync(src, standalonePublicDir); } catch {}
+        break;
+      }
+    }
+  }
 
   const serverEnv = {
     ...process.env,
     PORT: port.toString(),
-    NEXT_PUBLIC_APP_URL: `http://localhost:${port}`,
+    HOSTNAME: "127.0.0.1",
+    NODE_ENV: "production" as const,
     DATABASE_URL: dbUrl,
     ELECTRON_RUN_AS_NODE: "1",
   };
 
-  serverProcess = fork(nextBin, ["start", "-p", port.toString()], {
-    cwd: workingDir,
+  console.log(`Starting standalone server: ${serverJs} on port ${port}`);
+
+  serverProcess = fork(serverJs, [], {
+    cwd: standaloneDir,
     env: serverEnv,
     execPath: process.execPath,
-    stdio: "inherit",
+    stdio: "pipe",
   });
 
+  // Log stdout/stderr for debugging
+  serverProcess.stdout?.on("data", (d: Buffer) => console.log("[next]", d.toString().trim()));
+  serverProcess.stderr?.on("data", (d: Buffer) => console.error("[next:err]", d.toString().trim()));
+
   serverProcess.on("error", (err) => {
-    console.error("Failed to start Next.js production server:", err);
+    console.error("Server process error:", err);
     dialog.showErrorBox(
-      "Next.js Server Process Error",
-      `Failed to start Next.js process from ${nextBin}:\n\n${err.stack || err.message}`
+      "Next.js Server Error",
+      `Failed to start server from ${serverJs}:\n\n${err.stack || err.message}`
     );
   });
 
   serverProcess.on("exit", (code, signal) => {
-    console.log(`Next.js server exited with code ${code} signal ${signal}`);
+    console.log(`Server exited: code=${code} signal=${signal}`);
+    if (code !== 0 && code !== null && !isQuitting) {
+      dialog.showErrorBox(
+        "Server Crashed",
+        `The Next.js server exited unexpectedly with code ${code}.`
+      );
+    }
   });
+}
+
+/**
+ * Recursively copy a directory
+ */
+function copyDirSync(src: string, dest: string) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
 /**
@@ -155,14 +224,13 @@ function getAppIcon(): Electron.NativeImage {
   const rawAppPath = app.getAppPath();
   const unpackedPath = rawAppPath.replace("app.asar", "app.asar.unpacked");
 
-  const candidatePaths = [
-    path.join(rawAppPath, "public", "icon.png"),
+  const candidates = [
     path.join(unpackedPath, "public", "icon.png"),
+    path.join(rawAppPath, "public", "icon.png"),
     path.join(__dirname, "..", "public", "icon.png"),
-    path.join(rawAppPath, "public", "gs-icon.webp"),
   ];
 
-  for (const iconPath of candidatePaths) {
+  for (const iconPath of candidates) {
     try {
       if (fs.existsSync(iconPath)) {
         const img = nativeImage.createFromPath(iconPath);

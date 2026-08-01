@@ -4,7 +4,8 @@ import path from "path";
 
 import { getChromeDataDir } from "@/lib/paths";
 
-const CHROME_PATH = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const getChromePath = () => path.join("C:", "Program Files", "Google", "Chrome", "Application", "chrome.exe");
+const CHROME_PATH = getChromePath();
 const USER_DATA_DIR = getChromeDataDir();
 
 export interface FacebookPost {

@@ -6,19 +6,24 @@
   },
   asar: true,
   asarUnpack: [
-    "node_modules/next/**/*",
-    "node_modules/@prisma/**/*",
+    ".next/standalone/**/*",
+    ".next/static/**/*",
+    "public/**/*",
+    "prisma/**/*",
     "node_modules/.prisma/**/*",
-    "node_modules/playwright/**/*",
-    ".next/**/*"
+    "node_modules/@prisma/**/*",
+    "node_modules/playwright/**/*"
   ],
   files: [
     "dist-electron/**/*",
-    ".next/**/*",
+    ".next/standalone/**/*",
+    ".next/static/**/*",
     "public/**/*",
     "package.json",
     ".env",
-    "prisma/**/*"
+    "prisma/**/*",
+    "node_modules/.prisma/**/*",
+    "node_modules/@prisma/**/*"
   ],
   win: {
     target: ["nsis"],
