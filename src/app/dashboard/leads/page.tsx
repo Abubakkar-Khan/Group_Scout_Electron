@@ -145,8 +145,9 @@ export default function LeadsPage() {
           lastLeadIdRef.current = fetchedPosts[0].id
         }
 
-        setLeads(fetchedPosts)
-        setTotalCount(newTotal)
+        const newLeads = fetchedPosts
+        setLeads(prev => JSON.stringify(prev) === JSON.stringify(newLeads) ? prev : newLeads)
+        setTotalCount(prev => prev === newTotal ? prev : newTotal)
       }
     } catch (e) {
       console.error(e)
