@@ -9,6 +9,7 @@ const USER_DATA_DIR = getChromeDataDir();
 function getSystemChromePath(): string | null {
   const candidates = [
     process.env.GROUPSCOUT_CHROME_PATH,
+    process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : undefined,
     process.env.PROGRAMFILES
       ? path.join(process.env.PROGRAMFILES, "Google", "Chrome", "Application", "chrome.exe")
       : undefined,
