@@ -359,6 +359,9 @@ function formatError(error: unknown) {
 }
 
 app.whenReady().then(async () => {
+  // Remove default top menu bar (File, Edit, View, Window) for clean UI
+  Menu.setApplicationMenu(null);
+
   try {
     const port = isDev ? DEFAULT_PORT : await findAvailablePort(DEFAULT_PORT);
     activeServerPort = port;

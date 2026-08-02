@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GroupScout | High-Intent Facebook Leads",
+  title: "GroupScout",
   description: "Monitor Facebook Groups for high-intent leads.",
   icons: {
     icon: "/gs-icon.webp",
