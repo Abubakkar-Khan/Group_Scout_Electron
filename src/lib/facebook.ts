@@ -4,9 +4,24 @@ import path from "path";
 
 import { getChromeDataDir } from "@/lib/paths";
 
-const getChromePath = () => path.join("C:", "Program Files", "Google", "Chrome", "Application", "chrome.exe");
-const CHROME_PATH = getChromePath();
 const USER_DATA_DIR = getChromeDataDir();
+
+function getSystemChromePath(): string | null {
+  const candidates = [
+    process.env.GROUPSCOUT_CHROME_PATH,
+    process.env.PROGRAMFILES
+      ? path.join(process.env.PROGRAMFILES, "Google", "Chrome", "Application", "chrome.exe")
+      : undefined,
+    process.env["PROGRAMFILES(X86)"]
+      ? path.join(process.env["PROGRAMFILES(X86)"], "Google", "Chrome", "Application", "chrome.exe")
+      : undefined,
+    process.env.LOCALAPPDATA
+      ? path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe")
+      : undefined,
+  ];
+
+  return candidates.find((candidate): candidate is string => Boolean(candidate && fs.existsSync(candidate))) || null;
+}
 
 export interface FacebookPost {
   postId: string;
@@ -186,7 +201,8 @@ export class FacebookAutomator {
     this.isHeadlessMode = isHeadless;
 
     // Use system Chrome if installed on Windows for best compatibility and saved sessions
-    const useSystemChrome = fs.existsSync(CHROME_PATH);
+    const chromePath = getSystemChromePath();
+    const useSystemChrome = Boolean(chromePath);
 
     console.log(`[FacebookAutomator] Launching Browser (System Chrome: ${useSystemChrome}, Headless: ${isHeadless})...`);
     
@@ -202,8 +218,8 @@ export class FacebookAutomator {
       ],
     };
 
-    if (useSystemChrome) {
-      launchOptions.executablePath = CHROME_PATH;
+    if (chromePath) {
+      launchOptions.executablePath = chromePath;
     }
 
     this.context = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);

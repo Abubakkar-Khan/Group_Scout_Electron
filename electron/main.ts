@@ -4,24 +4,64 @@ import fs from "fs";
 import http from "http";
 import net from "net";
 import { fork, ChildProcess } from "child_process";
-import dotenv from "dotenv";
-
-// Load environment variables from .env file if available
-const envPaths = [
-  path.join(app.getAppPath(), ".env"),
-  path.join(app.getAppPath().replace("app.asar", "app.asar.unpacked"), ".env"),
-];
-for (const p of envPaths) {
-  if (fs.existsSync(p)) { dotenv.config({ path: p }); break; }
-}
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let serverProcess: ChildProcess | null = null;
+let serverStartupError: Error | null = null;
+let serverStderr = "";
+let activeServerPort = 3000;
 let isQuitting = false;
 
 const isDev = !app.isPackaged;
 const DEFAULT_PORT = 3000;
+
+function getResourcePath(...segments: string[]) {
+  const base = app.isPackaged ? process.resourcesPath : app.getAppPath();
+  return path.join(base, ...segments);
+}
+
+function getStandaloneDir() {
+  return app.isPackaged
+    ? getResourcePath("next")
+    : path.join(app.getAppPath(), ".next", "standalone");
+}
+
+function loadEnvFile(filePath: string) {
+  if (!fs.existsSync(filePath)) return false;
+
+  for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const equalsIndex = trimmed.indexOf("=");
+    if (equalsIndex === -1) continue;
+
+    const key = trimmed.slice(0, equalsIndex).trim();
+    if (!key || process.env[key] !== undefined) continue;
+
+    let value = trimmed.slice(equalsIndex + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
+
+  return true;
+}
+
+// Load environment variables from the app bundle if available.
+for (const envPath of [
+  path.join(getStandaloneDir(), ".env"),
+  getResourcePath(".env"),
+  path.join(app.getAppPath(), ".env"),
+]) {
+  if (loadEnvFile(envPath)) break;
+}
 
 // Enforce single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
@@ -60,6 +100,11 @@ function waitForServer(port: number, timeoutMs = 60000): Promise<void> {
   const startTime = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
+      if (serverStartupError) {
+        reject(serverStartupError);
+        return;
+      }
+
       const req = http.get(`http://127.0.0.1:${port}`, (res) => {
         if (res.statusCode && res.statusCode < 500) {
           resolve();
@@ -73,6 +118,11 @@ function waitForServer(port: number, timeoutMs = 60000): Promise<void> {
     };
 
     const retry = () => {
+      if (serverStartupError) {
+        reject(serverStartupError);
+        return;
+      }
+
       if (Date.now() - startTime > timeoutMs) {
         reject(new Error(`Timeout waiting for Next.js server on port ${port}`));
       } else {
@@ -90,9 +140,6 @@ function waitForServer(port: number, timeoutMs = 60000): Promise<void> {
 async function startNextServer(port: number): Promise<void> {
   if (isDev) return;
 
-  const rawAppPath = app.getAppPath();
-  const unpackedBase = rawAppPath.replace("app.asar", "app.asar.unpacked");
-
   // --- Database setup: copy seed db to writable %APPDATA% ---
   const userDataPath = app.getPath("userData");
   if (!fs.existsSync(userDataPath)) {
@@ -102,7 +149,7 @@ async function startNextServer(port: number): Promise<void> {
   const dbPath = path.join(userDataPath, "database.db");
   if (!fs.existsSync(dbPath)) {
     // Try to copy the seed database shipped with the app
-    for (const base of [unpackedBase, rawAppPath]) {
+    for (const base of [getResourcePath(), app.getAppPath()]) {
       const src = path.join(base, "prisma", "dev.db");
       if (fs.existsSync(src)) {
         try { fs.copyFileSync(src, dbPath); } catch {}
@@ -113,10 +160,11 @@ async function startNextServer(port: number): Promise<void> {
   const dbUrl = `file:${dbPath.replace(/\\/g, "/")}`;
 
   // --- Find standalone server.js ---
-  // Next.js standalone output places server.js at .next/standalone/server.js
+  // The packaged app copies .next/standalone verbatim to resources/next.
+  const standaloneDir = getStandaloneDir();
   const standaloneServerPaths = [
-    path.join(unpackedBase, ".next", "standalone", "server.js"),
-    path.join(rawAppPath, ".next", "standalone", "server.js"),
+    path.join(standaloneDir, "server.js"),
+    path.join(app.getAppPath().replace("app.asar", "app.asar.unpacked"), ".next", "standalone", "server.js"),
   ];
 
   let serverJs = "";
@@ -131,35 +179,6 @@ async function startNextServer(port: number): Promise<void> {
     return;
   }
 
-  // The standalone server needs the static files. In standalone mode,
-  // Next.js expects them at <standalone>/.next/static and <standalone>/public.
-  // We copy them from the unpacked/asar paths if they don't exist in standalone dir.
-  const standaloneDir = path.dirname(serverJs);
-  const standaloneStaticDir = path.join(standaloneDir, ".next", "static");
-  const standalonePublicDir = path.join(standaloneDir, "public");
-
-  // Copy .next/static if missing from standalone
-  if (!fs.existsSync(standaloneStaticDir)) {
-    for (const base of [unpackedBase, rawAppPath]) {
-      const src = path.join(base, ".next", "static");
-      if (fs.existsSync(src)) {
-        try { copyDirSync(src, standaloneStaticDir); } catch {}
-        break;
-      }
-    }
-  }
-
-  // Copy public/ if missing from standalone
-  if (!fs.existsSync(standalonePublicDir)) {
-    for (const base of [unpackedBase, rawAppPath]) {
-      const src = path.join(base, "public");
-      if (fs.existsSync(src)) {
-        try { copyDirSync(src, standalonePublicDir); } catch {}
-        break;
-      }
-    }
-  }
-
   const serverEnv = {
     ...process.env,
     PORT: port.toString(),
@@ -167,34 +186,30 @@ async function startNextServer(port: number): Promise<void> {
     NODE_ENV: "production" as const,
     DATABASE_URL: dbUrl,
     ELECTRON_RUN_AS_NODE: "1",
+    NEXT_TELEMETRY_DISABLED: "1",
   };
 
   console.log(`Starting standalone server: ${serverJs} on port ${port}`);
+  serverStartupError = null;
+  serverStderr = "";
 
   serverProcess = fork(serverJs, [], {
-    cwd: standaloneDir,
+    cwd: path.dirname(serverJs),
     env: serverEnv,
-    // execPath: process.execPath, test
+    execPath: process.execPath,
     stdio: "pipe",
   });
-  
-  serverProcess.stderr?.on("data", (d) => {
-    dialog.showErrorBox("Next.js Error", d.toString());
-  });
 
-  serverProcess.stdout?.on("data", (d) => {
-    console.log("[next]", d.toString());
-  });
-  
-  
-  
-  
-  
   // Log stdout/stderr for debugging
   serverProcess.stdout?.on("data", (d: Buffer) => console.log("[next]", d.toString().trim()));
-  serverProcess.stderr?.on("data", (d: Buffer) => console.error("[next:err]", d.toString().trim()));
+  serverProcess.stderr?.on("data", (d: Buffer) => {
+    const text = d.toString();
+    serverStderr = (serverStderr + text).slice(-6000);
+    console.error("[next:err]", text.trim());
+  });
 
   serverProcess.on("error", (err) => {
+    serverStartupError = err;
     console.error("Server process error:", err);
     dialog.showErrorBox(
       "Next.js Server Error",
@@ -205,40 +220,25 @@ async function startNextServer(port: number): Promise<void> {
   serverProcess.on("exit", (code, signal) => {
     console.log(`Server exited: code=${code} signal=${signal}`);
     if (code !== 0 && code !== null && !isQuitting) {
+      serverStartupError = new Error(
+        `The Next.js server exited unexpectedly with code ${code}.\n\n${serverStderr.trim()}`
+      );
       dialog.showErrorBox(
         "Server Crashed",
-        `The Next.js server exited unexpectedly with code ${code}.`
+        serverStartupError.message
       );
     }
   });
 }
 
 /**
- * Recursively copy a directory
- */
-function copyDirSync(src: string, dest: string) {
-  fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirSync(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-/**
  * Create or return application icon
  */
 function getAppIcon(): Electron.NativeImage {
-  const rawAppPath = app.getAppPath();
-  const unpackedPath = rawAppPath.replace("app.asar", "app.asar.unpacked");
-
   const candidates = [
-    path.join(unpackedPath, "public", "icon.png"),
-    path.join(rawAppPath, "public", "icon.png"),
+    getResourcePath("next", "public", "icon.png"),
+    getResourcePath("public", "icon.png"),
+    path.join(app.getAppPath(), "public", "icon.png"),
     path.join(__dirname, "..", "public", "icon.png"),
   ];
 
@@ -353,9 +353,15 @@ async function createWindow(serverUrl: string) {
 // Setup IPC handlers
 ipcMain.handle("app:version", () => app.getVersion());
 
+function formatError(error: unknown) {
+  if (error instanceof Error) return error.stack || error.message;
+  return String(error);
+}
+
 app.whenReady().then(async () => {
   try {
     const port = isDev ? DEFAULT_PORT : await findAvailablePort(DEFAULT_PORT);
+    activeServerPort = port;
     const serverUrl = `http://localhost:${port}`;
 
     if (!isDev) {
@@ -365,11 +371,11 @@ app.whenReady().then(async () => {
     await waitForServer(port);
     createTray();
     await createWindow(serverUrl);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Initialization error:", error);
     dialog.showErrorBox(
       "GroupScout Startup Error",
-      `Failed to launch application:\n\n${error?.stack || error?.message || String(error)}`
+      `Failed to launch application:\n\n${formatError(error)}`
     );
     app.quit();
   }
@@ -381,8 +387,7 @@ app.on("window-all-closed", () => {
 
 app.on("activate", () => {
   if (mainWindow === null) {
-    const port = isDev ? DEFAULT_PORT : DEFAULT_PORT;
-    createWindow(`http://localhost:${port}`);
+    createWindow(`http://localhost:${activeServerPort}`);
   }
 });
 
