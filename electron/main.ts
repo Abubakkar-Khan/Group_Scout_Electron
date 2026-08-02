@@ -140,24 +140,7 @@ function waitForServer(port: number, timeoutMs = 60000): Promise<void> {
 async function startNextServer(port: number): Promise<void> {
   if (isDev) return;
 
-  // --- Database setup: copy seed db to writable %APPDATA% ---
-  const userDataPath = app.getPath("userData");
-  if (!fs.existsSync(userDataPath)) {
-    try { fs.mkdirSync(userDataPath, { recursive: true }); } catch {}
-  }
-
-  const dbPath = path.join(userDataPath, "database.db");
-  if (!fs.existsSync(dbPath)) {
-    // Try to copy the seed database shipped with the app
-    for (const base of [getResourcePath(), app.getAppPath()]) {
-      const src = path.join(base, "prisma", "dev.db");
-      if (fs.existsSync(src)) {
-        try { fs.copyFileSync(src, dbPath); } catch {}
-        break;
-      }
-    }
-  }
-  const dbUrl = `file:${dbPath.replace(/\\/g, "/")}`;
+  const dbUrl = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_wBXiqg87fxLN@ep-empty-bar-aouxp6cb-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 
   // --- Find standalone server.js ---
   // The packaged app copies .next/standalone verbatim to resources/next.
