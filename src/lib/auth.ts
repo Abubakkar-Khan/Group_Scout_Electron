@@ -1,5 +1,6 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { prisma } from "./db";
+import { authPrisma } from "./auth-db";
 
 export async function getSession(req?: Request) {
   try {
@@ -15,8 +16,7 @@ export async function getSession(req?: Request) {
     }
 
     if (!token) {
-      // Fallback: If no session token is set, but a user exists in DB (e.g. desktop single-user mode),
-      // return the first user so the application remains functional.
+      // Fallback: If no token is set, check local SQLite default user
       const defaultUser = await prisma.user.findFirst();
       if (defaultUser) {
         return {
@@ -27,12 +27,14 @@ export async function getSession(req?: Request) {
       return null;
     }
 
-    const session = await prisma.session.findUnique({
+    // 1. Verify session token online against Neon PostgreSQL DB
+    let session = await authPrisma.session.findUnique({
       where: { token },
       include: { user: true },
-    });
+    }).catch(() => null);
 
-    if (!session) {
+    if (!session || new Date(session.expiresAt) < new Date()) {
+      // Fallback to local user if offline
       const defaultUser = await prisma.user.findFirst();
       if (defaultUser) {
         return {
@@ -43,9 +45,12 @@ export async function getSession(req?: Request) {
       return null;
     }
 
-    if (new Date(session.expiresAt) < new Date()) {
-      return null;
-    }
+    // 2. Ensure local SQLite has a cached record of the user for local foreign keys
+    await prisma.user.upsert({
+      where: { id: session.user.id },
+      update: { name: session.user.name, email: session.user.email },
+      create: { id: session.user.id, name: session.user.name, email: session.user.email, emailVerified: session.user.emailVerified },
+    }).catch(() => {});
 
     return {
       user: session.user,

@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -7,12 +7,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// --- Auth Models ---
+// --- Auth Models (Cached locally) ---
 
 model User {
   id               String            @id
   name             String
-  email            String
+  email            String            @unique
   emailVerified    Boolean           @default(false)
   image            String?
   createdAt        DateTime          @default(now())
@@ -27,14 +27,13 @@ model User {
   logEvents        LogEvent[]
   settings         Settings?
 
-  @@unique([email])
   @@map("user")
 }
 
 model Session {
   id        String   @id
   expiresAt DateTime
-  token     String
+  token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   ipAddress String?
@@ -42,7 +41,6 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([token])
   @@map("session")
 }
 
@@ -76,7 +74,7 @@ model Verification {
   @@map("verification")
 }
 
-// --- Application Models ---
+// --- Application Models (Stored strictly locally in SQLite) ---
 
 model Keyword {
   id        String   @id @default(cuid())
@@ -120,9 +118,9 @@ model LogEvent {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String   // "INFO", "WARN", "ERROR", "SUCCESS"
+  type      String
   message   String
-  metadata  String?  // JSON stringified details
+  metadata  String?
   createdAt DateTime @default(now())
 }
 
@@ -152,11 +150,11 @@ model Settings {
   activeTo             String   @default("20:00")
   monitoringMode       String   @default("default")
   autoScrollPages      Int      @default(5)
-  scrollSpeed          String   @default("medium") // "fast", "medium", "slow", "human"
-  interGroupDelaySeconds Int    @default(3)        // Pause between group scans
+  scrollSpeed          String   @default("medium")
+  interGroupDelaySeconds Int    @default(3)
   maxPostAgeHours      Int      @default(48)
   autoDeleteViewedDays Int      @default(30)
-  groqApiKey           String?  // Encrypted API key
+  groqApiKey           String?
   useGroq              Boolean  @default(false)
   groqSystemPrompt     String   @default("You are a lead classifier. Determine if this Facebook post is genuinely looking for the service related to the provided keywords. Respond ONLY with valid JSON: {\"relevant\": true/false}")
 }

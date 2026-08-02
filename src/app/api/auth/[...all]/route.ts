@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { authPrisma } from "@/lib/auth-db";
 import { getSession } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -27,12 +28,22 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
         return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
       }
 
-      const user = await prisma.user.findUnique({ where: { email } });
+      // 1. Authenticate against online Neon PostgreSQL Database
+      let user = await authPrisma.user.findUnique({ where: { email } }).catch(() => null);
+      if (!user) {
+        // Fallback to local user if offline or unmigrated
+        user = await prisma.user.findUnique({ where: { email } }).catch(() => null);
+      }
+
       if (!user) {
         return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
       }
 
-      const account = await prisma.account.findFirst({ where: { userId: user.id } });
+      let account = await authPrisma.account.findFirst({ where: { userId: user.id } }).catch(() => null);
+      if (!account) {
+        account = await prisma.account.findFirst({ where: { userId: user.id } }).catch(() => null);
+      }
+
       if (account?.password) {
         const isValid = bcrypt.compareSync(password, account.password);
         if (!isValid) {
@@ -41,9 +52,10 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
       }
 
       const token = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const expiresAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days session life
 
-      await prisma.session.create({
+      // Create session in online Neon PostgreSQL DB
+      await authPrisma.session.create({
         data: {
           id: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           userId: user.id,
@@ -52,7 +64,26 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
           createdAt: new Date(),
           updatedAt: new Date(),
         },
+      }).catch(() => {
+        // Fallback local session if offline
+        return prisma.session.create({
+          data: {
+            id: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            userId: user.id,
+            token,
+            expiresAt,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
       });
+
+      // Cache user locally in SQLite for local relations
+      await prisma.user.upsert({
+        where: { id: user.id },
+        update: { name: user.name, email: user.email },
+        create: { id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified },
+      }).catch(() => {});
 
       const response = NextResponse.json({ user, success: true });
       response.cookies.set("session_token", token, {
@@ -76,7 +107,7 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
         return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
       }
 
-      const existing = await prisma.user.findUnique({ where: { email } });
+      const existing = await authPrisma.user.findUnique({ where: { email } }).catch(() => null);
       if (existing) {
         return NextResponse.json({ error: "User already exists" }, { status: 400 });
       }
@@ -85,7 +116,8 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
       const hashedPassword = bcrypt.hashSync(password, 10);
       const now = new Date();
 
-      const user = await prisma.user.create({
+      // 1. Create User in online Neon PostgreSQL Database
+      const user = await authPrisma.user.create({
         data: {
           id: userId,
           name,
@@ -94,9 +126,22 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
           createdAt: now,
           updatedAt: now,
         },
+      }).catch(async () => {
+        // Fallback local user creation if offline
+        return prisma.user.create({
+          data: {
+            id: userId,
+            name,
+            email,
+            emailVerified: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
       });
 
-      await prisma.account.create({
+      // 2. Create Account in online Neon PostgreSQL Database
+      await authPrisma.account.create({
         data: {
           id: `acc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           userId: user.id,
@@ -106,9 +151,15 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
           createdAt: now,
           updatedAt: now,
         },
-      });
+      }).catch(() => {});
 
-      // Create default settings if needed
+      // 3. Cache user and create default settings locally in SQLite
+      await prisma.user.upsert({
+        where: { id: user.id },
+        update: { name: user.name, email: user.email },
+        create: { id: user.id, name: user.name, email: user.email, emailVerified: true },
+      }).catch(() => {});
+
       await prisma.settings.create({
         data: {
           userId: user.id,
@@ -116,9 +167,10 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
       }).catch(() => {});
 
       const token = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days session life
 
-      await prisma.session.create({
+      // Create Session in online Neon PostgreSQL DB
+      await authPrisma.session.create({
         data: {
           id: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           userId: user.id,
@@ -127,7 +179,7 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
           createdAt: now,
           updatedAt: now,
         },
-      });
+      }).catch(() => {});
 
       const response = NextResponse.json({ user, success: true });
       response.cookies.set("session_token", token, {
