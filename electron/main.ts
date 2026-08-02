@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog, shell } from "electron";
 import path from "path";
 import fs from "fs";
 import http from "http";
@@ -329,6 +329,14 @@ async function createWindow(serverUrl: string) {
       nodeIntegration: false,
       sandbox: true,
     },
+  });
+
+  // Intercept target="_blank" links and open in default external browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url);
+    }
+    return { action: "deny" };
   });
 
   mainWindow.loadURL(serverUrl);

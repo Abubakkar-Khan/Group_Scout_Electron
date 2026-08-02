@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { ExternalLink, Activity, Users, Target } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { formatExternalUrl } from "@/lib/utils"
 
 interface Lead {
   id: string
@@ -266,7 +267,7 @@ export default function DashboardPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <a 
-                        href={lead.url} 
+                        href={formatExternalUrl(lead.url)} 
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className={buttonVariants({ variant: "outline", size: "sm", className: "gap-1.5 h-8 px-3 text-xs font-medium" })}
@@ -313,7 +314,7 @@ export default function DashboardPage() {
           <div className="mt-6 flex justify-end gap-2 pt-4 border-t border-border/50">
             <Button variant="outline" onClick={() => setSelectedPost(null)}>Close</Button>
             <a 
-              href={selectedPost?.url || "#"} 
+              href={formatExternalUrl(selectedPost?.url)} 
               target="_blank" 
               rel="noopener noreferrer" 
               className={buttonVariants({ variant: "default", className: "gap-2" })}

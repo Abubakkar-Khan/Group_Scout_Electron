@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { formatExternalUrl } from "@/lib/utils"
 
 interface Lead {
   id: string
@@ -599,7 +600,7 @@ export default function LeadsPage() {
                       </TableCell>
                       <TableCell className="text-right align-middle">
                         <a 
-                          href={lead.url} 
+                          href={formatExternalUrl(lead.url)} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className={buttonVariants({ variant: "outline", size: "sm", className: "gap-1.5 h-7 px-2.5 text-xs font-medium border-border hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors" })}
@@ -700,7 +701,7 @@ export default function LeadsPage() {
                 Close
               </Button>
               <a 
-                href={selectedPost?.url || "#"} 
+                href={formatExternalUrl(selectedPost?.url)} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className={buttonVariants({ variant: "default", className: "gap-2 h-9 px-4 text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-md shadow-emerald-500/20" })}
