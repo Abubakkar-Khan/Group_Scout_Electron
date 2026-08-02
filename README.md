@@ -1,151 +1,197 @@
 # GroupScout
-> **Automated High-Intent Facebook Lead Generation & Group Monitoring**
+> **Automated High-Intent Facebook Lead Generation & Desktop Group Monitoring System**
 
-GroupScout is an Electron & Next.js desktop software that automatically monitors Facebook Groups for high-intent lead opportunities. It runs an invisible background **Chromium** engine powered by Playwright to intercept Facebook network traffic, match your target keywords, and capture leads into a local **SQLite** database and live dashboard.
+GroupScout is a powerful, production-grade desktop application built with **Electron**, **Next.js 16 (App Router)**, **Playwright**, **Prisma**, **SQLite**, and **Neon PostgreSQL**. It automatically monitors public and private Facebook Groups 24/7 for high-intent lead opportunities, filtering chatter and delivering leads straight to your live desktop dashboard.
 
 ---
 
 ## Table of Contents
+
 1. [Executive Summary](#1-executive-summary)
-2. [Key Capabilities & Features](#2-key-capabilities--features)
-3. [System Architecture & Workflow](#3-system-architecture--workflow)
-   - [3.1 Overall End-to-End Flow](#31-overall-end-to-end-flow)
-   - [3.2 Dual Extraction Scraping Pipeline](#32-dual-extraction-scraping-pipeline)
-   - [3.3 Anti-Detection & Account Safety Shield](#33-anti-detection--account-safety-shield)
-   - [3.4 Data Storage Architecture (SQLite + Neon)](#34-data-storage-architecture-sqlite--neon)
-4. [Database Schema (ERD)](#4-database-schema-erd)
-5. [Quick Start & Usage Guide](#5-quick-start--usage-guide)
-6. [Tech Stack](#6-tech-stack)
+2. [Key Architecture & Features](#2-key-architecture--features)
+3. [System Architecture & Diagrams](#3-system-architecture--diagrams)
+   - [3.1 End-to-End System Architecture](#31-end-to-end-system-architecture)
+   - [3.2 Decoupled Dual-Database Architecture (Neon Auth + Local SQLite Data)](#32-decoupled-dual-database-architecture-neon-auth--local-sqlite-data)
+   - [3.3 Dual-Tier Extraction Pipeline (GraphQL Interception + DOM Safety Net)](#33-dual-tier-extraction-pipeline-graphql-interception--dom-safety-net)
+   - [3.4 Anti-Detection & Evasion Shield](#34-anti-detection--evasion-shield)
+   - [3.5 Execution & Timer Lock Control Flow](#35-execution--timer-lock-control-flow)
+4. [Database Entity Relationship Diagram (ERD)](#4-database-entity-relationship-diagram-erd)
+5. [CSV Export & Reporting Engine](#5-csv-export--reporting-engine)
+6. [Desktop Installer & Standalone Build System](#6-desktop-installer--standalone-build-system)
+7. [Installation & Developer Quick Start](#7-installation--developer-quick-start)
+8. [Technology Stack](#8-technology-stack)
 
 ---
 
 ## 1. Executive Summary
 
-* **The Problem**: Finding clients in Facebook Groups requires hours of manual scrolling, dealing with spam, and missing urgent posts because you were away from your computer.
-* **The Solution**: GroupScout acts as your 24/7 silent assistant. You add Facebook Group URLs and target keywords (e.g. *"looking for a developer"*, *"need a designer"*). GroupScout automatically browses the groups in an invisible background window, extracts newly published posts, filters out non-relevant chatter, and alerts you instantly in your dashboard with direct links to respond.
+* **The Problem**: Finding clients in Facebook Groups manually requires hours of endless scrolling, wading through spam, and missing urgent client requests when you are away from your PC.
+* **The Solution**: GroupScout acts as a silent, intelligent 24/7 desktop assistant. You enter Facebook Group URLs and target keywords/phrases (e.g. *"looking for a web developer"*, *"need a plumber"*, *"hiring designer"*). GroupScout automatically scans target groups in an invisible background browser, extracts newly published posts, filters out non-relevant chatter, and alerts you instantly in your dashboard with direct links to respond.
 
 ---
 
-## 2. Key Capabilities & Features
+## 2. Key Architecture & Features
 
-* **Invisible Background Chromium Engine**: Operates silently in headless mode using Playwright. No browser popups or stolen mouse focus.
-* **Dual Extraction Pipeline**: Combines hidden **GraphQL Network Interception** (listening to raw JSON payloads) with **DOM Parsing Fallbacks** for 100% extraction accuracy.
-* **Instant Group Metadata Scraping**: The second you add a Facebook Group URL, GroupScout automatically fetches its real group title and cover photo upfront.
-* **Instant Lead Processing**: AI relevance filtering (`useGroq`) is turned **OFF by default**, meaning matched posts become active leads on your dashboard within seconds. (You can enable Groq LLaMA 3 AI filtering whenever needed in Settings).
-* **Local & Private Data**: All your extracted leads, keywords, and group data stay stored locally in your **SQLite** database (`dev.db`). Only user login authentication routes through **Neon PostgreSQL**.
-* **Anti-Detection Shield**: Mimics human behavior with randomized micro-scrolling, human pauses (300ms–800ms), and automated `webdriver` evasion flags to keep your Facebook account safe.
-
----
-
-## 3. System Architecture & Workflow
-
-### 3.1 Overall End-to-End Flow
-
-```mermaid
-graph TD
-    A[User Adds Group & Keywords] -->|Trigger Engine| B[Background Engine Init]
-    B -->|Launch Headless Chromium| C[Navigate to FB Group]
-    C --> D{Interception & Extraction}
-    D -->|GraphQL / DOM Data| E[Keyword Matcher]
-    E -- Match Found --> F{AI Groq Enabled?}
-    E -- No Match --> G[Ignore Post]
-    F -- No (Default: Fast Mode) --> H[Save as Active Lead]
-    F -- Yes --> I[Groq LLaMA 3 Classifier]
-    I -- Relevant --> H
-    I -- Not Relevant --> G
-    H --> J[(Local SQLite Database)]
-    J --> K[Live Dashboard UI]
-```
-
-### 3.2 Dual Extraction Scraping Pipeline
-
-GroupScout does not rely solely on fragile HTML scrapers. It uses a **two-tier extraction engine**:
-
-```mermaid
-graph LR
-    subgraph Browser Context
-        FB[Facebook Group Page]
-    end
-
-    subgraph Tier 1: Primary
-        FB -->|GraphQL POST Stream| Interceptor[Network Interceptor]
-        Interceptor -->|Deep JSON Parser| Posts1[Raw Posts Data]
-    end
-
-    subgraph Tier 2: Fallback
-        FB -->|DOM Elements| DOMParser[DOM Tree Inspector]
-        DOMParser -->|Query Selectors| Posts2[Fallback Posts Data]
-    end
-
-    Posts1 --> Merger[De-duplication & Merge Engine]
-    Posts2 --> Merger
-    Merger --> Output[Clean Lead List]
-```
-
-1. **Tier 1 (GraphQL Interceptor)**: Listens passively to Facebook's backend `/api/graphql/` responses as the page loads. Parses deep JSON trees to extract complete post text, author info, and exact post URLs without being blocked by UI popups.
-2. **Tier 2 (DOM Inspector Fallback)**: If network parsing misses a post, the engine scans visible `div[role="article"]` elements and `dir="auto"` text blocks on the webpage.
+* **Invisible Background Scraper Engine**: Operates silently in headless mode using Playwright Chromium. No popup windows or stolen mouse focus.
+* **Dual-Tier Scraping Pipeline**: Intercepts raw Facebook **GraphQL Network Payloads** (`/api/graphql/`) for instant JSON extraction, backed by a **DOM Element Inspector** safety net for 100% post capture accuracy.
+* **Decoupled Dual-Database System**:
+  * **Online Neon PostgreSQL DB**: Manages authentication (`User`, `Account`, `Session`, `Verification`) with a **15-day session life**.
+  * **Local SQLite DB (`database.db`)**: Stores **100% of your application data locally** (`Keyword`, `MonitoredGroup`, `Post`, `LogEvent`, `Settings`). Zero leads or keywords are ever pushed online.
+* **Next.js 16 Standalone Packaging**: Built with `output: "standalone"`, bundling server dependencies into a self-contained runtime that executes seamlessly on clean client machines without requiring Node.js.
+* **Smart Sequential Queue & Timer Lock**: Scans groups 1-by-1 with human-like delays. If a scan is running when the interval timer fires, the trigger is safely skipped so ongoing scans are never interrupted or restarted mid-way.
+* **UTF-8 BOM CSV Exporter**: Generates clean CSV reports (up to 5,000 records) filtered by date/time ranges (`24h`, `7d`, `30d`, `All Time`), keywords, or status with proper character encoding for Microsoft Excel.
+* **Sleek Custom Desktop UI**: Custom dark-mode scrollbars, frameless window setup, auto-hide menu bar, and system tray minimize support.
+* **External Link Handler**: All lead links automatically open in your default system browser (Chrome, Edge, Brave) using Electron's `shell.openExternal`.
 
 ---
 
-### 3.3 Anti-Detection & Account Safety Shield
+## 3. System Architecture & Diagrams
 
-To protect your Facebook account from bot flags, GroupScout implements multiple layers of human simulation:
+### 3.1 End-to-End System Architecture
 
 ```mermaid
 flowchart TD
-    SubGraph1[Stealth Configuration]
-    A[Playwright Chromium] -->|addInitScript| B[Set navigator.webdriver = false]
-    A -->|Launch Args| C[Disable Blink Automation Flags]
-    A -->|Persist Context| D[Reuse Local Chrome Data Session]
+    subgraph Client Desktop Shell
+        Electron[Electron Main Process / Tray] -->|Fork Standalone| Server[Next.js Standalone Server]
+        UI[Next.js App Router Dashboard] <-->|HTTP / REST API| Server
+    end
 
-    SubGraph2[Human Behavior Emulation]
-    E[Page Interaction] -->|humanScroll| F[Random Bursts 200px-600px]
-    E -->|humanDelay| G[Random Micro-Pauses 300ms-800ms]
-    E -->|Inter-Group| H[Random Group Delays 1.5s-3s]
+    subgraph Automation Engine
+        Server -->|Trigger Engine| Playwright[Playwright Headless Chromium]
+        Playwright -->|Cookies / Session| ChromeData[%APPDATA%/GroupScout/chrome-data]
+        Playwright -->|Scrape Feed| FB[Facebook Group Page]
+    end
+
+    subgraph Data Extraction & Processing
+        FB -->|Intercept Network| GraphQL[GraphQL JSON Stream]
+        FB -->|Fallback DOM| DOM[DOM Article Inspector]
+        GraphQL & DOM --> Dedupe[Deduplication & Normalize]
+        Dedupe --> Matching[In-Memory Keyword & Negative Keyword Matcher]
+        Matching -- Match Found --> GroqCheck{Groq AI Enabled?}
+        GroqCheck -- No (Fast Mode) --> Lead[Valid Lead]
+        GroqCheck -- Yes --> Groq[Groq LLaMA 3.1 LLM Classifier]
+        Groq -- Relevant --> Lead
+        Groq -- Irrelevant --> Drop[Discard Post]
+    end
+
+    subgraph Storage Layer
+        Lead -->|Save Lead| LocalDB[(Local SQLite: database.db)]
+        Server -->|Authenticate Login| NeonDB[(Online Neon PostgreSQL DB)]
+    end
 ```
 
 ---
 
-### 3.4 Data Storage Architecture (SQLite + Neon)
+### 3.2 Decoupled Dual-Database Architecture (Neon Auth + Local SQLite Data)
 
-GroupScout uses a **hybrid database model** for performance and privacy:
+GroupScout enforces strict separation between authentication and user data to ensure maximum privacy and offline performance:
 
 ```mermaid
 graph TD
-    App[GroupScout Next.js / Electron App]
-    
-    subgraph Neon Cloud PostgreSQL
-        Neon[(Neon DB)]
-        Auth[User / Session / Account / Verification]
+    App[GroupScout Application Engine]
+
+    subgraph Online Cloud Storage
+        Neon[(Neon PostgreSQL DB)]
+        AuthData[User / Account / Session / Verification]
+        SessionPolicy[15-Day Session Expiration Policy]
     end
 
-    subgraph Local Device Storage
-        SQLite[(Local SQLite: dev.db)]
-        AppData[MonitoredGroup / Post / Keyword / Settings / LogEvent]
+    subgraph Local PC Disk Storage
+        SQLite[(Local SQLite: database.db)]
+        AppData[MonitoredGroup / Post / Keyword / NegativeKeyword / LogEvent / Settings]
     end
 
-    App -->|Remote Auth & Login| Auth
-    App -->|Local Speed & Data Privacy| AppData
+    App -->|1. Online Login & Auth Check| AuthData
+    AuthData --> SessionPolicy
+    App -->|2. 100% Local Storage & Privacy| AppData
+
+    style Online Cloud Storage fill:#1e293b,stroke:#3b82f6,stroke-width:2px;
+    style Local PC Disk Storage fill:#064e3b,stroke:#10b981,stroke-width:2px;
 ```
 
 ---
 
-## 4. Database Schema (ERD)
+### 3.3 Dual-Tier Extraction Pipeline (GraphQL Interception + DOM Safety Net)
+
+```mermaid
+graph LR
+    subgraph Browser Network Layer
+        FB[Facebook Group Page]
+    end
+
+    subgraph Primary Extractor
+        FB -->|Intercept Network| NetParser[GraphQL JSON Payload Parser]
+        NetParser -->|Extracted Posts| List1[GraphQL Posts]
+    end
+
+    subgraph Fallback Extractor
+        FB -->|Query DOM| DOMParser[DOM Article Inspector]
+        DOMParser -->|Fallback Posts| List2[DOM Posts]
+    end
+
+    List1 --> Merger[Deduplication Engine]
+    List2 --> Merger
+    Merger --> Output[Normalized Post Stream]
+```
+
+1. **Tier 1 (GraphQL Interceptor)**: Listens passively to Facebook's backend `/api/graphql/` responses as the page loads. Parses deep JSON payload structures to extract full post text, author info, and exact post permalinks.
+2. **Tier 2 (DOM Inspector Fallback)**: Scans visible `div[role="article"]` elements and `dir="auto"` text blocks on the webpage to capture any post that network interception missed.
+
+---
+
+### 3.4 Anti-Detection & Evasion Shield
+
+```mermaid
+flowchart TD
+    subgraph Evasion Layer
+        A[Playwright Launch Args] -->|--disable-blink-features=AutomationControlled| B[Remove Automation Flags]
+        A -->|--test-type| C[Suppress Infobar Warnings]
+        A -->|addInitScript| D[Set navigator.webdriver = false]
+    end
+
+    subgraph Emulation Layer
+        E[Browser Actions] -->|humanScroll| F[Randomized Scroll Bursts 200px - 600px]
+        E -->|humanDelay| G[Micro Pauses 300ms - 800ms]
+        E -->|interGroupDelay| H[Pause 3s - 5s Between Groups]
+    end
+```
+
+---
+
+### 3.5 Execution & Timer Lock Control Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: Engine Initialized
+    Idle --> CheckLock: Timer Interval Fires (Every N mins)
+    CheckLock --> Skipped: isRunning == true
+    Skipped --> Idle: Skip Trigger & Continue Ongoing Scan
+    CheckLock --> ActiveScan: isRunning == false
+    ActiveScan --> SetLock: Set isRunning = true
+    SetLock --> LoopGroups: Loop Groups 1-by-1
+    LoopGroups --> ScrapeGroup: Scrape & Extract Posts
+    ScrapeGroup --> MatchLeads: Match Keywords & Save Leads
+    MatchLeads --> InterGroupPause: Pause interGroupDelaySeconds
+    InterGroupPause --> LoopGroups: Next Group in Queue
+    LoopGroups --> Complete: All Groups Scanned
+    Complete --> ReleaseLock: Set isRunning = false
+    ReleaseLock --> Idle: Standby Until Next Cycle
+```
+
+---
+
+## 4. Database Entity Relationship Diagram (ERD)
 
 ```mermaid
 erDiagram
-    User ||--o{ Session : has
-    User ||--o{ Account : has
-    User ||--o{ Keyword : defines
-    User ||--o{ MonitoredGroup : monitors
-    User ||--o{ Post : receives
-    User ||--o{ LogEvent : logs
-    User ||--o| Settings : configures
-
+    %% --- Online Neon PostgreSQL Database (Auth Only) ---
+    User ||--o{ Session : manages
+    User ||--o{ Account : authenticates
+    
     User {
         string id PK
         string name
-        string email
+        string email UK
         boolean emailVerified
         string image
         DateTime createdAt
@@ -154,8 +200,8 @@ erDiagram
 
     Session {
         string id PK
-        DateTime expiresAt
-        string token
+        DateTime expiresAt "15-Day Expiry"
+        string token UK
         DateTime createdAt
         DateTime updatedAt
         string ipAddress
@@ -174,25 +220,38 @@ erDiagram
         DateTime accessTokenExpiresAt
         DateTime refreshTokenExpiresAt
         string scope
-        string password
+        string password "Bcrypt Hashed"
         DateTime createdAt
         DateTime updatedAt
     }
 
-    Settings {
+    Verification {
         string id PK
-        string userId FK
-        int scanInterval
-        string activeFrom
-        string activeTo
-        string monitoringMode
-        int autoScrollPages
-        string groqApiKey
-        boolean useGroq
-        string groqSystemPrompt
+        string identifier
+        string value
+        DateTime expiresAt
+        DateTime createdAt
+        DateTime updatedAt
     }
 
+    %% --- Local SQLite Database (Local Data Only) ---
+    User ||--o{ Keyword : defines
+    User ||--o{ NegativeKeyword : excludes
+    User ||--o{ MonitoredGroup : tracks
+    User ||--o{ Post : captures
+    User ||--o{ LogEvent : logs
+    User ||--o| Settings : configures
+    MonitoredGroup ||--o{ Post : contains
+
     Keyword {
+        string id PK
+        string userId FK
+        string keyword
+        boolean enabled
+        DateTime createdAt
+    }
+
+    NegativeKeyword {
         string id PK
         string userId FK
         string keyword
@@ -225,6 +284,23 @@ erDiagram
         DateTime createdAt
     }
 
+    Settings {
+        string id PK
+        string userId FK
+        int scanInterval
+        string activeFrom
+        string activeTo
+        string monitoringMode
+        int autoScrollPages
+        string scrollSpeed
+        int interGroupDelaySeconds
+        int maxPostAgeHours
+        int autoDeleteViewedDays
+        string groqApiKey
+        boolean useGroq
+        string groqSystemPrompt
+    }
+
     LogEvent {
         string id PK
         string userId FK
@@ -237,46 +313,80 @@ erDiagram
 
 ---
 
-## 5. Quick Start & Usage Guide
+## 5. CSV Export & Reporting Engine
 
-### 1. Installation
-```bash
-# 1. Clone the repository
-git clone https://github.com/Abubakkar-Khan/Group_Scout_Electron.git
-cd Group_Scout_Electron
+GroupScout features a full-fidelity CSV reporting module on the **Leads Dashboard**:
 
-# 2. Install dependencies
-npm install
-
-# 3. Initialize local SQLite database
-npx prisma db push
-npx prisma generate
-```
-
-### 2. Running Locally
-```bash
-# Run Next.js Web App
-npm run dev
-
-# OR Run Full Desktop Electron App
-npm run electron:dev
-```
-
-### 3. Usage Steps
-1. **Sign Up / Log In**: Open the app and create your account.
-2. **Add Keywords**: Enter keywords like `web design`, `developer`, `plumber`, `looking for`.
-3. **Add Groups**: Paste Facebook Group URLs. GroupScout will instantly fetch the group's title and cover image.
-4. **Start Engine**: Click **Run Engine**. GroupScout will run invisibly in the background and surface leads live on your dashboard!
+* **Multi-Filter Fetching**: Exports up to **5,000 matching leads** across all pages based on your active filters (**Time Range: 24h, 7d, 30d, or All Time**, Keywords, Monitored Groups, Search Query, Status).
+* **UTF-8 Byte Order Mark (`\uFEFF`)**: Embedded UTF-8 BOM encoding ensures Microsoft Excel and Google Sheets open exported CSV files cleanly without character corruption.
+* **Blob Object Download (`URL.createObjectURL`)**: Prevents string truncation, corrupted URI encoding (`encodeURI`), or broken special characters (`#`, `%`, `&`, emojis, line breaks).
 
 ---
 
-## 6. Tech Stack
+## 6. Desktop Installer & Standalone Build System
+
+GroupScout is packaged using **`electron-builder`** and Next.js **Standalone Output Mode**:
+
+* **Zero External Dependencies**: The installer packages Electron's embedded Node.js runtime (`ELECTRON_RUN_AS_NODE: "1"`) alongside `.next/standalone`, allowing the application to install and execute seamlessly on clean Windows and macOS computers without Node.js installed.
+* **Writable AppData Pathing**: In production, SQLite files and session cookies are located in `%APPDATA%\GroupScout` (`~/Library/Preferences/GroupScout` on macOS), ensuring full read/write access outside read-only ASAR archives.
+
+---
+
+## 7. Installation & Developer Quick Start
+
+### 1. Environment Setup
+Create a `.env` file in the root directory:
+```env
+DATABASE_URL="file:./prisma/dev.db"
+NEON_DATABASE_URL="postgresql://neondb_owner:YOUR_NEON_KEY@ep-empty-bar.aws.neon.tech/neondb?sslmode=require"
+ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
+
+### 2. Install & Sync Databases
+```bash
+# Clone repository
+git clone https://github.com/Abubakkar-Khan/Group_Scout_Electron.git
+cd Group_Scout_Electron
+
+# Install node dependencies
+npm install
+
+# Generate Prisma Clients for Neon Auth & Local SQLite
+npx prisma generate --schema=prisma/auth.prisma
+npx prisma generate --schema=prisma/schema.prisma
+
+# Sync database schemas
+npx prisma db push --schema=prisma/auth.prisma
+npx prisma db push --schema=prisma/schema.prisma
+```
+
+### 3. Running Development Mode
+```bash
+# Run Next.js web dashboard
+npm run dev
+
+# OR Run full desktop Electron app concurrently
+npm run electron:dev
+```
+
+### 4. Packaging Standalone Installer Executable
+```bash
+# Compile TypeScript & Package with electron-builder
+npm run electron:build
+```
+The output setup installer executable will be generated at **`release/GroupScout Setup 0.1.0.exe`**.
+
+---
+
+## 8. Technology Stack
 
 | Layer | Technology |
 | :--- | :--- |
-| **Desktop Framework** | Electron + Next.js 16 (React 19) |
-| **Styling & UI** | Vanilla CSS, Tailwind CSS, Shadcn UI, Lucide Icons |
+| **Desktop Framework** | Electron + Next.js 16 (React 19, Standalone Mode) |
+| **Styling & Theme** | Vanilla CSS, Tailwind CSS, Shadcn UI, Lucide Icons, Custom WebKit Scrollbars |
 | **Automation Engine** | Playwright (Headless Chromium) |
-| **Local Database** | SQLite (`dev.db`) via Prisma ORM |
-| **Auth Database** | Neon PostgreSQL |
-| **Optional AI** | Groq SDK (LLaMA 3.1) |
+| **Auth Database** | Neon PostgreSQL (15-Day Session Duration) |
+| **Local Application Database** | SQLite (`database.db`) via Prisma ORM |
+| **Optional AI Filter** | Groq SDK (LLaMA 3.1) |
+| **Packaging & Distribution** | `electron-builder` (NSIS Installer for Windows / DMG for macOS) |
