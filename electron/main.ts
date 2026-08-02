@@ -174,10 +174,22 @@ async function startNextServer(port: number): Promise<void> {
   serverProcess = fork(serverJs, [], {
     cwd: standaloneDir,
     env: serverEnv,
-    execPath: process.execPath,
+    // execPath: process.execPath, test
     stdio: "pipe",
   });
+  
+  serverProcess.stderr?.on("data", (d) => {
+    dialog.showErrorBox("Next.js Error", d.toString());
+  });
 
+  serverProcess.stdout?.on("data", (d) => {
+    console.log("[next]", d.toString());
+  });
+  
+  
+  
+  
+  
   // Log stdout/stderr for debugging
   serverProcess.stdout?.on("data", (d: Buffer) => console.log("[next]", d.toString().trim()));
   serverProcess.stderr?.on("data", (d: Buffer) => console.error("[next:err]", d.toString().trim()));

@@ -1,6 +1,7 @@
 import crypto from "crypto"
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || ""
+const DEFAULT_KEY = crypto.createHash("sha256").update("GroupScout_Secure_Local_Key_Seed").digest("hex")
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || DEFAULT_KEY
 const ALGORITHM = "aes-256-gcm"
 
 export function encrypt(text: string): string {

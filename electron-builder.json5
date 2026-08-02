@@ -10,6 +10,8 @@
     ".next/static/**/*",
     "public/**/*",
     "prisma/**/*",
+    "node_modules/next/**/*",
+    "node_modules/@next/**/*",
     "node_modules/.prisma/**/*",
     "node_modules/@prisma/**/*",
     "node_modules/playwright/**/*"
@@ -22,6 +24,8 @@
     "package.json",
     ".env",
     "prisma/**/*",
+    "node_modules/next/**/*",
+    "node_modules/@next/**/*",
     "node_modules/.prisma/**/*",
     "node_modules/@prisma/**/*"
   ],
