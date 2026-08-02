@@ -101,13 +101,16 @@ graph TD
         AppData[MonitoredGroup / Post / Keyword / NegativeKeyword / LogEvent / Settings]
     end
 
-    App -->|1. Online Login & Auth Check| AuthData
+    App -->|1. Online Auth Check| AuthData
     AuthData --> SessionPolicy
-    App -->|2. 100% Local Storage & Privacy| AppData
+    App -->|2. Auto-Sync User Record| SQLite
+    App -->|3. 100% Local App Data| AppData
 
     style Online Cloud Storage fill:#1e293b,stroke:#3b82f6,stroke-width:2px;
     style Local PC Disk Storage fill:#064e3b,stroke:#10b981,stroke-width:2px;
 ```
+
+* **Automatic User Sync**: When you log in, `getSession()` authenticates your session online via Neon DB, then automatically caches/upserts your `User` record and default `Settings` into local SQLite (`database.db`). This ensures all local keyword, group, and lead inserts satisfy local SQLite foreign key constraints smoothly.
 
 ---
 
