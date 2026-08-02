@@ -207,6 +207,9 @@ export class FacebookAutomator {
 
     console.log(`[FacebookAutomator] Launching Browser (System Chrome: ${useSystemChrome}, Headless: ${isHeadless})...`);
     
+
+    console.log(`[FacebookAutomator] Launching Browser (System Chrome: ${useSystemChrome}, Headless: ${isHeadless})...`);
+    
     const launchOptions: any = {
       headless: isHeadless,
       viewport: { width: 1366, height: 768 },
@@ -215,6 +218,7 @@ export class FacebookAutomator {
       args: [
         "--disable-notifications",
         "--disable-infobars",
+        "--test-type",
         "--disable-blink-features=AutomationControlled",
       ],
     };
