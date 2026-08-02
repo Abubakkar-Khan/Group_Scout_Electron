@@ -33,15 +33,15 @@ export async function GET() {
       }
     })
     
-    // Map to flat structure for frontend
     const formattedGroups = groups.map(g => ({
       ...g,
       newPostsToday: g._count.posts
     }))
     
     return NextResponse.json(formattedGroups)
-  } catch {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  } catch (err: any) {
+    console.error("[API Groups GET] Error:", err)
+    return NextResponse.json({ error: err.message || "Failed to fetch groups" }, { status: 500 })
   }
 }
 
@@ -59,7 +59,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid Facebook Group URL" }, { status: 400 })
     }
 
-    // Try to immediately scrape group name & image
     let groupName = facebookGroupId
     let iconUrl = ""
 
@@ -83,10 +82,11 @@ export async function POST(request: Request) {
     })
     
     return NextResponse.json(group)
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[API Groups POST] Error:", error)
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "Group is already being monitored" }, { status: 400 })
     }
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    return NextResponse.json({ error: error.message || "Failed to add group" }, { status: 500 })
   }
 }

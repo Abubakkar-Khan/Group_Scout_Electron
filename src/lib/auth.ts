@@ -31,10 +31,13 @@ export async function getSession(req?: Request) {
     let session = await authPrisma.session.findUnique({
       where: { token },
       include: { user: true },
-    }).catch(() => null);
+    }).catch((err) => {
+      console.warn("[getSession] Online Neon auth lookup failed, falling back locally:", err.message);
+      return null;
+    });
 
     if (!session || new Date(session.expiresAt) < new Date()) {
-      // Fallback to local user if offline
+      // Fallback to local user if offline or session expired locally
       const defaultUser = await prisma.user.findFirst();
       if (defaultUser) {
         return {
@@ -45,12 +48,21 @@ export async function getSession(req?: Request) {
       return null;
     }
 
-    // 2. Ensure local SQLite has a cached record of the user for local foreign keys
-    await prisma.user.upsert({
-      where: { id: session.user.id },
-      update: { name: session.user.name, email: session.user.email },
-      create: { id: session.user.id, name: session.user.name, email: session.user.email, emailVerified: session.user.emailVerified },
-    }).catch(() => {});
+    // 2. Ensure local SQLite has a cached record of the user and default settings for local relations
+    try {
+      await prisma.user.upsert({
+        where: { id: session.user.id },
+        update: { name: session.user.name, email: session.user.email },
+        create: { id: session.user.id, name: session.user.name, email: session.user.email, emailVerified: session.user.emailVerified },
+      });
+
+      const existingSettings = await prisma.settings.findUnique({ where: { userId: session.user.id } });
+      if (!existingSettings) {
+        await prisma.settings.create({ data: { userId: session.user.id } }).catch(() => {});
+      }
+    } catch (dbErr) {
+      console.error("[getSession] Local SQLite user sync error:", dbErr);
+    }
 
     return {
       user: session.user,

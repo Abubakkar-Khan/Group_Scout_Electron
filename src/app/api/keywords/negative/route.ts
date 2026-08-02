@@ -13,8 +13,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     })
     return NextResponse.json(negativeKeywords)
-  } catch {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  } catch (err: any) {
+    console.error("[API NegativeKeywords GET] Error:", err)
+    return NextResponse.json({ error: err.message || "Failed to fetch negative keywords" }, { status: 500 })
   }
 }
 
@@ -39,11 +40,12 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(negativeKeyword)
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[API NegativeKeywords POST] Error:", error)
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "Negative keyword already exists" }, { status: 400 })
     }
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    return NextResponse.json({ error: error.message || "Failed to add negative keyword" }, { status: 500 })
   }
 }
 
@@ -73,8 +75,9 @@ export async function PATCH(request: Request) {
     })
 
     return NextResponse.json(updated)
-  } catch {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  } catch (err: any) {
+    console.error("[API NegativeKeywords PATCH] Error:", err)
+    return NextResponse.json({ error: err.message || "Failed to update negative keyword" }, { status: 500 })
   }
 }
 
@@ -98,7 +101,8 @@ export async function DELETE(request: Request) {
 
     await prisma.negativeKeyword.delete({ where: { id } })
     return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  } catch (err: any) {
+    console.error("[API NegativeKeywords DELETE] Error:", err)
+    return NextResponse.json({ error: err.message || "Failed to delete negative keyword" }, { status: 500 })
   }
 }

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-
 import { prisma } from "@/lib/db"
 
 export async function GET() {
@@ -13,8 +12,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     })
     return NextResponse.json(keywords)
-  } catch {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  } catch (err: any) {
+    console.error("[API Keywords GET] Error:", err)
+    return NextResponse.json({ error: err.message || "Failed to fetch keywords" }, { status: 500 })
   }
 }
 
@@ -35,7 +35,8 @@ export async function POST(request: Request) {
       },
     })
     return NextResponse.json(created)
-  } catch {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  } catch (err: any) {
+    console.error("[API Keywords POST] Error:", err)
+    return NextResponse.json({ error: err.message || "Failed to create keyword" }, { status: 500 })
   }
 }
