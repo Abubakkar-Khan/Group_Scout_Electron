@@ -55,9 +55,13 @@ export default function DashboardPage() {
         ])
         if (leadsRes.ok) {
           const data = await leadsRes.json()
-          setLeads(data.posts || data)
+          const fetched: Lead[] = data.posts || data
+          setLeads(prev => JSON.stringify(prev) === JSON.stringify(fetched) ? prev : fetched)
         }
-        if (statsRes.ok) setStats(await statsRes.json())
+        if (statsRes.ok) {
+          const newStats = await statsRes.json()
+          setStats(prev => JSON.stringify(prev) === JSON.stringify(newStats) ? prev : newStats)
+        }
       } catch (e) {
         console.error(e)
       } finally {
