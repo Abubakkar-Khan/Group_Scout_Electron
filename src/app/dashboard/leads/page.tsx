@@ -188,31 +188,61 @@ export default function LeadsPage() {
     }
   }
 
-  const exportCSV = () => {
-    if (leads.length === 0) {
-      toast.error("No leads available to export")
-      return
+  const exportCSV = async () => {
+    try {
+      toast.info("Preparing CSV export...")
+      
+      // Fetch all matching filtered leads (up to 5000) for active filters and time range
+      let url = `/api/posts?relevant=true&limit=5000&page=1`
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
+      if (filter === "NEW") url += `&viewed=false`
+      if (filter === "VIEWED") url += `&viewed=true`
+      if (selectedKeywords.length > 0) url += `&keywords=${encodeURIComponent(selectedKeywords.join(","))}`
+      if (selectedGroups.length > 0) url += `&groupIds=${encodeURIComponent(selectedGroups.join(","))}`
+      if (timeRange !== "ALL") url += `&timeRange=${encodeURIComponent(timeRange)}`
+
+      const res = await fetch(url)
+      if (!res.ok) {
+        toast.error("Failed to fetch leads for export")
+        return
+      }
+
+      const data = await res.json()
+      const allExportLeads: Lead[] = data.posts || []
+
+      if (allExportLeads.length === 0) {
+        toast.error("No leads available to export for current filters")
+        return
+      }
+
+      const headers = ["Group", "Keyword", "Content", "URL", "Status", "Date"]
+      const rows = allExportLeads.map(l => [
+        `"${(l.group?.name || '').replace(/"/g, '""')}"`,
+        `"${(l.keyword || '').replace(/"/g, '""')}"`,
+        `"${(l.content || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`,
+        `"${(l.url || '').replace(/"/g, '""')}"`,
+        l.viewed ? "Viewed" : "New",
+        `"${new Date(l.createdAt).toLocaleString()}"`
+      ])
+
+      // \uFEFF is UTF-8 BOM so Excel opens text without character corruption
+      const csvString = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n")
+      const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" })
+      const link = document.createElement("a")
+      const blobUrl = URL.createObjectURL(blob)
+      
+      link.setAttribute("href", blobUrl)
+      link.setAttribute("download", `groupscout_leads_${new Date().toISOString().slice(0, 10)}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(blobUrl)
+
+      toast.success(`Exported ${allExportLeads.length} lead(s) to CSV`)
+    } catch (e) {
+      console.error("Export CSV error:", e)
+      toast.error("An error occurred while generating CSV export")
     }
-
-    const headers = ["Group", "Keyword", "Content", "URL", "Status", "Date"]
-    const rows = leads.map(l => [
-      `"${(l.group?.name || '').replace(/"/g, '""')}"`,
-      `"${l.keyword.replace(/"/g, '""')}"`,
-      `"${l.content.replace(/"/g, '""').replace(/\n/g, ' ')}"`,
-      `"${l.url}"`,
-      l.viewed ? "Viewed" : "New",
-      `"${new Date(l.createdAt).toLocaleString()}"`
-    ])
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n")
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement("a")
-    link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `groupscout_leads_${new Date().toISOString().slice(0, 10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    toast.success("Leads exported to CSV")
   }
 
   const totalPages = Math.ceil(totalCount / limit) || 1
