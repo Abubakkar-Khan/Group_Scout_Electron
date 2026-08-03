@@ -29,7 +29,7 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
       }
 
       // 1. Authenticate against online Neon PostgreSQL Database
-      let user = await authPrisma.user.findUnique({ where: { email } }).catch(() => null);
+      let user: any = await authPrisma.user.findUnique({ where: { email } }).catch(() => null);
       if (!user) {
         // Fallback to local user if offline or unmigrated
         user = await prisma.user.findUnique({ where: { email } }).catch(() => null);
@@ -37,6 +37,10 @@ export async function POST(request: Request, context: { params: Promise<{ all: s
 
       if (!user) {
         return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      }
+
+      if (user.banned) {
+        return NextResponse.json({ error: "Your account has been suspended. Please contact support." }, { status: 403 });
       }
 
       let account = await authPrisma.account.findFirst({ where: { userId: user.id } }).catch(() => null);

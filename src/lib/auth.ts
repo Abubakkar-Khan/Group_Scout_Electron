@@ -74,7 +74,11 @@ export async function getSession(req?: Request) {
       return null;
     });
 
-    if (!session || new Date(session.expiresAt) < new Date()) {
+    if (!session || new Date(session.expiresAt) < new Date() || session.user.banned) {
+      if (session?.user?.banned) {
+        console.warn(`[getSession] Account ${session.user.email} is suspended/banned.`);
+        return null;
+      }
       // Fallback to local user if offline or session expired locally
       const defaultUser = await prisma.user.findFirst();
       if (defaultUser) {

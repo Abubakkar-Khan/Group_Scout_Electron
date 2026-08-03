@@ -107,6 +107,39 @@ function getNestedObject(value: unknown, key: string): JsonObject | null {
   return nested && typeof nested === "object" && !Array.isArray(nested) ? nested as JsonObject : null;
 }
 
+function cleanFacebookPostUrl(rawUrl: string, groupId: string, postId: string): string {
+  let targetUrl = rawUrl || "";
+
+  // 1. If URL or postId contains a base64 Uzpf token, decode it
+  const tokenMatch = (targetUrl + " " + postId).match(/Uzpf[A-Za-z0-9_-]+/);
+  if (tokenMatch) {
+    try {
+      const decoded = Buffer.from(tokenMatch[0], "base64").toString("utf8");
+      // Extract numeric post ID from decoded token (e.g. S:_61583549031939:VK:2166691817601533)
+      const idMatch = decoded.match(/VK:(\d+)/i) || decoded.match(/:(\d+)$/);
+      if (idMatch && idMatch[1]) {
+        return `https://www.facebook.com/groups/${groupId}/posts/${idMatch[1]}/`;
+      }
+    } catch {}
+  }
+
+  // 2. If postId is purely numeric
+  if (postId && /^\d+$/.test(postId)) {
+    return `https://www.facebook.com/groups/${groupId}/posts/${postId}/`;
+  }
+
+  // 3. If targetUrl already has /posts/ or /permalink/ without Uzpf
+  if (targetUrl && !targetUrl.includes("Uzpf") && (targetUrl.includes("/posts/") || targetUrl.includes("/permalink/"))) {
+    return targetUrl;
+  }
+
+  if (postId && !postId.startsWith("hash_") && !postId.includes("Uzpf")) {
+    return `https://www.facebook.com/groups/${groupId}/posts/${postId}/`;
+  }
+
+  return targetUrl || `https://www.facebook.com/groups/${groupId}`;
+}
+
 /** Recursively search intercepted JSON for Facebook posts */
 function deepExtractPosts(obj: unknown, results: FacebookPost[], groupId: string) {
   if (!obj || typeof obj !== "object") return;
@@ -118,7 +151,7 @@ function deepExtractPosts(obj: unknown, results: FacebookPost[], groupId: string
   if (message.length > 5) {
     let url = stringValue(current.url) || stringValue(current.share_url) || stringValue(current.story_url);
     let author = "Unknown";
-    let postId = stringValue(current.id) || stringValue(current.post_id) || stringValue(current.legacy_fbid);
+    let postId = stringValue(current.legacy_fbid) || stringValue(current.post_id) || stringValue(current.id);
 
     if (Array.isArray(current.actors) && current.actors.length > 0) {
       const actor = current.actors[0] as JsonObject;
@@ -133,20 +166,18 @@ function deepExtractPosts(obj: unknown, results: FacebookPost[], groupId: string
     const permalink = getNestedObject(current, "permalink_url");
     if (!url && permalink) url = stringValue(permalink.url);
 
-    if (!url && postId) {
-      url = `https://www.facebook.com/groups/${groupId}/posts/${postId}`;
-    }
-
     if (!postId) {
       postId = stableHash(`${groupId}:${message}`);
     }
+
+    const cleanUrl = cleanFacebookPostUrl(url, groupId, postId);
 
     const isDuplicate = results.some(p => p.postId === postId || p.content === message);
     
     if (!isDuplicate) {
       results.push({
         postId,
-        url: url || `https://www.facebook.com/groups/${groupId}`,
+        url: cleanUrl,
         author,
         content: message,
         timestamp: new Date().toISOString(),
@@ -198,15 +229,12 @@ export class FacebookAutomator {
       }
     }
 
-    const isHeadless = overrideHeadless !== undefined ? overrideHeadless : process.env.HEADLESS !== "false";
+    const isHeadless = overrideHeadless !== undefined ? overrideHeadless : this.isHeadlessMode;
     this.isHeadlessMode = isHeadless;
 
     // Use system Chrome if installed on Windows for best compatibility and saved sessions
     const chromePath = getSystemChromePath();
     const useSystemChrome = Boolean(chromePath);
-
-    console.log(`[FacebookAutomator] Launching Browser (System Chrome: ${useSystemChrome}, Headless: ${isHeadless})...`);
-    
 
     console.log(`[FacebookAutomator] Launching Browser (System Chrome: ${useSystemChrome}, Headless: ${isHeadless})...`);
     

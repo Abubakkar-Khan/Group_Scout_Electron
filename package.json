@@ -11,8 +11,9 @@
     "start": "next start",
     "lint": "eslint",
     "electron:build:ts": "tsc -p tsconfig.electron.json",
+    "obfuscate": "javascript-obfuscator dist-electron/main.js --output dist-electron/main.js",
     "electron:dev": "concurrently -k \"next dev\" \"wait-on http://127.0.0.1:3000 && electron .\"",
-    "electron:build": "npm run build && npm run electron:build:ts && electron-builder"
+    "electron:build": "npm run build && npm run electron:build:ts && npm run obfuscate && electron-builder"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -48,6 +49,7 @@
     "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "javascript-obfuscator": "^5.5.0",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5",
