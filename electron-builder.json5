@@ -5,6 +5,7 @@
     output: "release"
   },
   asar: true,
+  compression: "normal",
   files: [
     "dist-electron/**/*",
     "package.json",
@@ -38,7 +39,7 @@
     }
   ],
   win: {
-    target: ["nsis"],
+    target: ["zip", "nsis"],
     icon: "public/icon.ico"
   },
   mac: {
@@ -51,6 +52,7 @@
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: "GroupScout"
+    shortcutName: "GroupScout",
+    differentialPackage: false
   }
 }

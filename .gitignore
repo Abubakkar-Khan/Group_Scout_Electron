@@ -51,3 +51,4 @@ next-env.d.ts
 /dist-electron/
 /release/
 *.log
+DEV_README.md

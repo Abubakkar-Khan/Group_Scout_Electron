@@ -1,6 +1,8 @@
 {
   "name": "groupscout",
   "version": "0.1.0",
+  "description": "Automated High-Intent Facebook Lead Generation & Group Monitoring",
+  "author": "Abubakkar Khan",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {

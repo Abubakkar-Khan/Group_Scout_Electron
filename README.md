@@ -18,8 +18,7 @@ GroupScout is a powerful, production-grade desktop application built with **Elec
 4. [Database Entity Relationship Diagram (ERD)](#4-database-entity-relationship-diagram-erd)
 5. [CSV Export & Reporting Engine](#5-csv-export--reporting-engine)
 6. [Desktop Installer & Standalone Build System](#6-desktop-installer--standalone-build-system)
-7. [Installation & Developer Quick Start](#7-installation--developer-quick-start)
-8. [Technology Stack](#8-technology-stack)
+7. [Technology Stack](#7-technology-stack)
 
 ---
 
@@ -335,54 +334,7 @@ GroupScout is packaged using **`electron-builder`** and Next.js **Standalone Out
 
 ---
 
-## 7. Installation & Developer Quick Start
-
-### 1. Environment Setup
-Create a `.env` file in the root directory:
-```env
-DATABASE_URL="file:./prisma/dev.db"
-NEON_DATABASE_URL="postgresql://neondb_owner:YOUR_NEON_KEY@ep-empty-bar.aws.neon.tech/neondb?sslmode=require"
-ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-```
-
-### 2. Install & Sync Databases
-```bash
-# Clone repository
-git clone https://github.com/Abubakkar-Khan/Group_Scout_Electron.git
-cd Group_Scout_Electron
-
-# Install node dependencies
-npm install
-
-# Generate Prisma Clients for Neon Auth & Local SQLite
-npx prisma generate --schema=prisma/auth.prisma
-npx prisma generate --schema=prisma/schema.prisma
-
-# Sync database schemas
-npx prisma db push --schema=prisma/auth.prisma
-npx prisma db push --schema=prisma/schema.prisma
-```
-
-### 3. Running Development Mode
-```bash
-# Run Next.js web dashboard
-npm run dev
-
-# OR Run full desktop Electron app concurrently
-npm run electron:dev
-```
-
-### 4. Packaging Standalone Installer Executable
-```bash
-# Compile TypeScript & Package with electron-builder
-npm run electron:build
-```
-The output setup installer executable will be generated at **`release/GroupScout Setup 0.1.0.exe`**.
-
----
-
-## 8. Technology Stack
+## 7. Technology Stack
 
 | Layer | Technology |
 | :--- | :--- |
