@@ -1,15 +1,8 @@
 import Groq from "groq-sdk"
-import { decrypt } from "./encryption"
 
-export function getGroqClient(encryptedApiKey: string | null | undefined): Groq {
-  if (!encryptedApiKey) {
-    throw new Error("Groq API Key is missing. Please add it in Settings.")
-  }
-
-  const apiKey = decrypt(encryptedApiKey)
-  
+export function getGroqClient(apiKey: string | null | undefined): Groq {
   if (!apiKey) {
-    throw new Error("Failed to decrypt Groq API Key.")
+    throw new Error("Groq API Key is missing. Please add it in Settings.")
   }
 
   return new Groq({ apiKey })

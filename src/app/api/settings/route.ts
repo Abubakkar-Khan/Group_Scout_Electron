@@ -3,7 +3,6 @@ import { getSession } from "@/lib/auth"
 import type { Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/db"
-import { encrypt } from "@/lib/encryption"
 
 export async function GET() {
   const session = await getSession()
@@ -92,9 +91,8 @@ export async function PATCH(request: Request) {
     }
 
     if (groqApiKey) {
-      const encryptedApiKey = encrypt(groqApiKey)
-      updateData.groqApiKey = encryptedApiKey
-      createData.groqApiKey = encryptedApiKey
+      updateData.groqApiKey = groqApiKey
+      createData.groqApiKey = groqApiKey
     }
 
     const settings = await prisma.settings.upsert({
