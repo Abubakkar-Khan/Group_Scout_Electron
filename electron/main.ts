@@ -140,7 +140,16 @@ function waitForServer(port: number, timeoutMs = 60000): Promise<void> {
 async function startNextServer(port: number): Promise<void> {
   if (isDev) return;
 
-  const dbUrl = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_wBXiqg87fxLN@ep-empty-bar-aouxp6cb-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+  // Ensure local SQLite database directory exists in %APPDATA%/GroupScout
+  const userHomeDir = process.env.APPDATA || (process.platform === "darwin" ? path.join(process.env.HOME || "", "Library", "Preferences") : path.join(process.env.HOME || "", ".config"));
+  const defaultSqliteDir = path.join(userHomeDir, "GroupScout");
+  if (!fs.existsSync(defaultSqliteDir)) {
+    fs.mkdirSync(defaultSqliteDir, { recursive: true });
+  }
+  const defaultSqliteFile = path.join(defaultSqliteDir, "database.db");
+  const localDbUrl = process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("file:")
+    ? process.env.DATABASE_URL
+    : `file:${defaultSqliteFile}`;
 
   // --- Find standalone server.js ---
   // The packaged app copies .next/standalone verbatim to resources/next.
@@ -167,7 +176,8 @@ async function startNextServer(port: number): Promise<void> {
     PORT: port.toString(),
     HOSTNAME: "127.0.0.1",
     NODE_ENV: "production" as const,
-    DATABASE_URL: dbUrl,
+    DATABASE_URL: localDbUrl,
+    NEON_DATABASE_URL: process.env.NEON_DATABASE_URL || "",
     ELECTRON_RUN_AS_NODE: "1",
     NEXT_TELEMETRY_DISABLED: "1",
   };

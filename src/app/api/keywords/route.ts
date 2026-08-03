@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSession } from "@/lib/auth"
+import { getSession, ensureLocalUser } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
 export async function GET() {
@@ -23,6 +23,8 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
+    await ensureLocalUser(session.user)
+
     const body = await request.json()
     const { keyword } = body
 

@@ -2,6 +2,44 @@ import { cookies } from "next/headers";
 import { prisma } from "./db";
 import { authPrisma } from "./auth-db";
 
+export async function ensureLocalUser(user: { id: string; name?: string | null; email: string; emailVerified?: boolean }) {
+  // First check if user already exists by ID
+  const existingById = await prisma.user.findUnique({ where: { id: user.id } });
+  
+  if (!existingById) {
+    // User ID doesn't exist locally. Check if another local user has the same email (stale record).
+    const existingByEmail = await prisma.user.findUnique({ where: { email: user.email } });
+    
+    if (existingByEmail && existingByEmail.id !== user.id) {
+      // Stale user with same email but different ID — replace it.
+      // Delete old user (cascades to keywords, groups, posts, settings, etc.)
+      await prisma.user.delete({ where: { id: existingByEmail.id } });
+    }
+
+    // Create the user fresh
+    await prisma.user.create({
+      data: {
+        id: user.id,
+        name: user.name || "User",
+        email: user.email,
+        emailVerified: user.emailVerified ?? true,
+      },
+    });
+  } else {
+    // User exists by ID — just update name/email
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { name: user.name || "User", email: user.email },
+    });
+  }
+
+  // Ensure default settings exist
+  const existingSettings = await prisma.settings.findUnique({ where: { userId: user.id } });
+  if (!existingSettings) {
+    await prisma.settings.create({ data: { userId: user.id } }).catch(() => {});
+  }
+}
+
 export async function getSession(req?: Request) {
   try {
     let token: string | undefined;
@@ -49,20 +87,7 @@ export async function getSession(req?: Request) {
     }
 
     // 2. Ensure local SQLite has a cached record of the user and default settings for local relations
-    try {
-      await prisma.user.upsert({
-        where: { id: session.user.id },
-        update: { name: session.user.name, email: session.user.email },
-        create: { id: session.user.id, name: session.user.name, email: session.user.email, emailVerified: session.user.emailVerified },
-      });
-
-      const existingSettings = await prisma.settings.findUnique({ where: { userId: session.user.id } });
-      if (!existingSettings) {
-        await prisma.settings.create({ data: { userId: session.user.id } }).catch(() => {});
-      }
-    } catch (dbErr) {
-      console.error("[getSession] Local SQLite user sync error:", dbErr);
-    }
+    await ensureLocalUser(session.user);
 
     return {
       user: session.user,
