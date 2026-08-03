@@ -36,6 +36,7 @@ GroupScout is a powerful, production-grade desktop application built with **Elec
 * **Decoupled Dual-Database System**:
   * **Online Neon PostgreSQL DB**: Manages authentication (`User`, `Account`, `Session`, `Verification`) with a **15-day session life**.
   * **Local SQLite DB (`database.db`)**: Stores **100% of your application data locally** (`Keyword`, `MonitoredGroup`, `Post`, `LogEvent`, `Settings`). Zero leads or keywords are ever pushed online.
+* **Smart Local User Pre-Sync (`ensureLocalUser`)**: Automatically validates and syncs user profiles into local SQLite before performing relational operations (adding groups, keywords, or leads), preventing foreign key constraints or stale record conflicts.
 * **Next.js 16 Standalone Packaging**: Built with `output: "standalone"`, bundling server dependencies into a self-contained runtime that executes seamlessly on clean client machines without requiring Node.js.
 * **Smart Sequential Queue & Timer Lock**: Scans groups 1-by-1 with human-like delays. If a scan is running when the interval timer fires, the trigger is safely skipped so ongoing scans are never interrupted or restarted mid-way.
 * **UTF-8 BOM CSV Exporter**: Generates clean CSV reports (up to 5,000 records) filtered by date/time ranges (`24h`, `7d`, `30d`, `All Time`), keywords, or status with proper character encoding for Microsoft Excel.
@@ -109,7 +110,7 @@ graph TD
     style Local PC Disk Storage fill:#064e3b,stroke:#10b981,stroke-width:2px;
 ```
 
-* **Automatic User Sync**: When you log in, `getSession()` authenticates your session online via Neon DB, then automatically caches/upserts your `User` record and default `Settings` into local SQLite (`database.db`). This ensures all local keyword, group, and lead inserts satisfy local SQLite foreign key constraints smoothly.
+* **Automatic User Sync & FK Protection (`ensureLocalUser`)**: When you log in or create app data, `ensureLocalUser()` authenticates your session online via Neon DB, then automatically caches/upserts your `User` record into local SQLite (`database.db`). If a stale local record with the same email exists under an old ID, it automatically cleans it up to guarantee foreign key integrity for `MonitoredGroup`, `Keyword`, and `Post`.
 
 ---
 
