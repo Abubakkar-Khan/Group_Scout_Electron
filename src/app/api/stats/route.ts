@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
     const dateFilter = startDate ? { createdAt: { gte: startDate } } : {}
 
-    const [keywordMatches, leads, totalLeads, latestSync, totalScrapedAgg, periodPostsCount, scanLogs] = await Promise.all([
+    const [keywordMatches, leads, totalLeads, latestSync, totalScrapedAgg, periodPostsCount, scanLogs, earliestScanLog] = await Promise.all([
       // Posts matching keywords in selected period
       prisma.post.count({
         where: {
@@ -77,6 +77,15 @@ export async function GET(request: Request) {
           ...dateFilter,
         },
         select: { metadata: true }
+      }),
+      // Earliest SCAN_STATS log to check if all scans occurred in current period
+      prisma.logEvent.findFirst({
+        where: {
+          userId: session.user.id,
+          type: "SCAN_STATS",
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true }
       })
     ])
 
@@ -104,10 +113,13 @@ export async function GET(request: Request) {
 
       if (logPeriodSum > 0) {
         periodScanned = logPeriodSum;
+      } else if (startDate && (!earliestScanLog || earliestScanLog.createdAt >= startDate)) {
+        // All scans ever run in DB occurred within current period window (e.g. today)
+        periodScanned = allTimeRawScanned;
       } else if (periodPostsCount > 0) {
-        periodScanned = periodPostsCount * 4; // Raw feed posts inspected is ~4x matched leads
+        periodScanned = Math.min(allTimeRawScanned, periodPostsCount * 4);
       } else {
-        periodScanned = Math.round(allTimeRawScanned * (period === "daily" ? 0.25 : period === "weekly" ? 0.6 : 0.85));
+        periodScanned = allTimeRawScanned;
       }
     }
 
