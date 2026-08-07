@@ -110,7 +110,12 @@ function getNestedObject(value: unknown, key: string): JsonObject | null {
 function cleanFacebookPostUrl(rawUrl: string, groupId: string, postId: string): string {
   let targetUrl = rawUrl || "";
 
-  // 1. If URL or postId contains a base64 Uzpf token, decode it
+  // Normalize relative Facebook URLs
+  if (targetUrl.startsWith("/")) {
+    targetUrl = `https://www.facebook.com${targetUrl}`;
+  }
+
+  // 1. Decode Uzpf token from rawUrl or postId if present
   const tokenMatch = (targetUrl + " " + postId).match(/Uzpf[A-Za-z0-9_-]+/);
   if (tokenMatch) {
     try {
@@ -118,23 +123,14 @@ function cleanFacebookPostUrl(rawUrl: string, groupId: string, postId: string): 
       // Extract numeric post ID from decoded token (e.g. S:_61583549031939:VK:2166691817601533)
       const idMatch = decoded.match(/VK:(\d+)/i) || decoded.match(/:(\d+)$/);
       if (idMatch && idMatch[1]) {
-        return `https://www.facebook.com/groups/${groupId}/posts/${idMatch[1]}/`;
+        return `https://www.facebook.com/groups/${groupId}?post_id=${idMatch[1]}`;
       }
     } catch {}
   }
 
-  // 2. If postId is purely numeric
-  if (postId && /^\d+$/.test(postId)) {
-    return `https://www.facebook.com/groups/${groupId}/posts/${postId}/`;
-  }
-
-  // 3. If targetUrl already has /posts/ or /permalink/ without Uzpf
-  if (targetUrl && !targetUrl.includes("Uzpf") && (targetUrl.includes("/posts/") || targetUrl.includes("/permalink/"))) {
-    return targetUrl;
-  }
-
+  // 2. Use direct group feed post_id parameter format (opens post inside group feed overlay)
   if (postId && !postId.startsWith("hash_") && !postId.includes("Uzpf")) {
-    return `https://www.facebook.com/groups/${groupId}/posts/${postId}/`;
+    return `https://www.facebook.com/groups/${groupId}?post_id=${postId}`;
   }
 
   return targetUrl || `https://www.facebook.com/groups/${groupId}`;
@@ -149,9 +145,14 @@ function deepExtractPosts(obj: unknown, results: FacebookPost[], groupId: string
 
   // Pattern: Comet story node with message
   if (message.length > 5) {
-    let url = stringValue(current.url) || stringValue(current.share_url) || stringValue(current.story_url);
+    let permalinkObj = getNestedObject(current, "permalink_url") || getNestedObject(current, "story_permalink");
+    let permalinkStr = permalinkObj ? stringValue(permalinkObj.url) : "";
+
+    let url = stringValue(current.url) || stringValue(current.share_url) || stringValue(current.story_url) || permalinkStr;
     let author = "Unknown";
-    let postId = stringValue(current.legacy_fbid) || stringValue(current.post_id) || stringValue(current.id);
+
+    // Priority for extracting real post ID: legacy_fbid -> post_id -> story_fbid -> feedback.legacy_fbid -> id
+    let postId = stringValue(current.legacy_fbid) || stringValue(current.post_id) || stringValue(current.story_fbid);
 
     if (Array.isArray(current.actors) && current.actors.length > 0) {
       const actor = current.actors[0] as JsonObject;
@@ -159,12 +160,15 @@ function deepExtractPosts(obj: unknown, results: FacebookPost[], groupId: string
     }
 
     const feedback = getNestedObject(current, "feedback");
-    if (!postId && feedback) {
-      postId = stringValue(feedback.subscription_target_id) || stringValue(feedback.id);
+    if (feedback) {
+      if (!postId) {
+        postId = stringValue(feedback.legacy_fbid) || stringValue(feedback.subscription_target_id) || stringValue(feedback.id);
+      }
     }
 
-    const permalink = getNestedObject(current, "permalink_url");
-    if (!url && permalink) url = stringValue(permalink.url);
+    if (!postId) {
+      postId = stringValue(current.id);
+    }
 
     if (!postId) {
       postId = stableHash(`${groupId}:${message}`);
@@ -715,8 +719,30 @@ export class FacebookAutomator {
         let name = "";
         let icon = "";
         
-        const h1 = document.querySelector('h1');
-        if (h1) name = h1.innerText.trim();
+        // Generic Facebook navbar titles to ignore
+        const genericTitles = ["notification", "notifications", "chat", "chats", "facebook", "home", "search", "menu", "messenger"];
+        
+        const h1s = Array.from(document.querySelectorAll('h1'));
+        const groupH1 = h1s.find(h => {
+          const text = (h.innerText || "").trim().toLowerCase();
+          return text.length > 0 && !genericTitles.includes(text);
+        });
+        
+        if (groupH1) {
+          name = groupH1.innerText.trim();
+        }
+
+        // Fallback: extract group name from document title (e.g. "(3) My Group Name | Facebook")
+        if (!name || genericTitles.includes(name.toLowerCase())) {
+          const docTitle = document.title || "";
+          const cleaned = docTitle
+            .replace(/^\(\d+\)\s*/, "") // Remove notification count (e.g. "(3)")
+            .replace(/\s*\|\s*Facebook$/i, "") // Remove "| Facebook"
+            .trim();
+          if (cleaned && !genericTitles.includes(cleaned.toLowerCase())) {
+            name = cleaned;
+          }
+        }
         
         const exactCover = document.querySelector('img[data-imgperflogname="profileCoverPhoto"]');
         if (exactCover) {
@@ -730,7 +756,10 @@ export class FacebookAutomator {
         return { name, icon };
       });
 
-      return { name: info.name || groupId, iconUrl: info.icon || "" };
+      const genericTitles = ["notification", "notifications", "chat", "chats", "facebook", "home", "search", "menu", "messenger"];
+      const finalName = info.name && !genericTitles.includes(info.name.toLowerCase()) ? info.name : groupId;
+
+      return { name: finalName, iconUrl: info.icon || "" };
     } catch (e) {
       console.error(`[FacebookAutomator] Error fetching metadata for group ${groupId}:`, e);
       return { name: groupId, iconUrl: "" };
